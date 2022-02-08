@@ -3,7 +3,7 @@ package org.apache.pinot.client;
 public class ConnectionPool extends ObjectPool<Connection> {
     private final String zkUrl;
 
-    public ConnectionPool(int maxConnections, String zkUrl) throws InterruptedException {
+    public ConnectionPool(int maxConnections, String zkUrl) {
         super(maxConnections);
         this.zkUrl = zkUrl;
     }

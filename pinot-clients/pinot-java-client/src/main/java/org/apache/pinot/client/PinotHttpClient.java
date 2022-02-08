@@ -38,9 +38,12 @@ public class PinotHttpClient {
     private ConnectionPool _connectionPool;
 
 
-    public PinotHttpClient(PinotHttpClientConfig config) throws InterruptedException {
+    public PinotHttpClient(PinotHttpClientConfig config) {
         this._pinotHttpClientConfig = config;
         this._connectionPool = new ConnectionPool(config.poolSize, config.zkUrl);
+    }
+
+    public void init() throws InterruptedException {
         _connectionPool.init();
     }
 
