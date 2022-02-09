@@ -75,7 +75,10 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    builder.setReadTimeout((int) BROKER_READ_TIMEOUT_MS)
+    builder
+            .setReadTimeout((int) BROKER_READ_TIMEOUT_MS)
+            .setKeepAlive(true)
+            .setPooledConnectionIdleTimeout(10000)
         .setConnectTimeout(BROKER_CONNECT_TIMEOUT_MS);
     _httpClient = Dsl.asyncHttpClient(builder.build());
   }
