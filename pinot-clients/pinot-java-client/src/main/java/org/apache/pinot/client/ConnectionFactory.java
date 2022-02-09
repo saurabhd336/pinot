@@ -28,7 +28,7 @@ import java.util.Properties;
  * Creates connections to Pinot, given various initialization methods.
  */
 public class ConnectionFactory {
-  private static PinotClientTransport _defaultTransport;
+  private static PinotClientTransport _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
 
   private ConnectionFactory() {
   }
@@ -40,7 +40,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers in the given Helix cluster
    */
   public static Connection fromZookeeper(String zkUrl) {
-    return fromZookeeper(zkUrl, getDefault());
+    return fromZookeeper(zkUrl, _defaultTransport);
   }
 
   /**
@@ -92,7 +92,7 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
-    return fromProperties(properties, getDefault());
+    return fromProperties(properties, _defaultTransport);
   }
 
   /**
@@ -113,7 +113,7 @@ public class ConnectionFactory {
    * @return A connection to the set of brokers specified
    */
   public static Connection fromHostList(String... brokers) {
-    return fromHostList(Arrays.asList(brokers), getDefault());
+    return fromHostList(Arrays.asList(brokers), _defaultTransport);
   }
 
   /**
@@ -138,12 +138,5 @@ public class ConnectionFactory {
   public static Connection fromHostList(Properties properties, List<String> brokers,
       PinotClientTransport transport) {
     return new Connection(properties, brokers, transport);
-  }
-
-  private static PinotClientTransport getDefault() {
-    if (_defaultTransport == null) {
-      _defaultTransport = new JsonAsyncHttpPinotClientTransportFactory().buildTransport();
-    }
-    return _defaultTransport;
   }
 }
