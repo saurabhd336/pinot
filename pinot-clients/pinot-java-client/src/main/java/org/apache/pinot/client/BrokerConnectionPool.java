@@ -15,7 +15,9 @@ public class BrokerConnectionPool {
 
   public Future<ResultSetGroup> execute(String query) throws Exception {
     BrokerChannel brokerChannel = _brokerChannelPool.lease(1000, TimeUnit.MILLISECONDS);
-    return brokerChannel.executeQuery(query);
+    Future<ResultSetGroup> result = brokerChannel.executeQuery(query);
+    _brokerChannelPool.release(brokerChannel);
+    return result;
   }
 
   public static BrokerConnectionPool createNewPool(String hostPort, int poolSizePerHost) throws Exception {
