@@ -39,6 +39,7 @@ public class BrokerResponseHandler extends SimpleChannelInboundHandler<FullHttpR
 
   @Override
   public void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
+    // TODO handle non 200 responses. Use promeise.setFailure()
     String responseBody = msg.content().toString(StandardCharsets.UTF_8);
     messageList.poll().setSuccess(new ResultSetGroup(BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody))));
   }
