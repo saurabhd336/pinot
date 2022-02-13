@@ -2,7 +2,6 @@ package org.apache.pinot.client;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
-import java.util.function.Function;
 
 
 public class PinotNettyClient {
@@ -40,8 +39,15 @@ public class PinotNettyClient {
 
   public Future<ResultSetGroup> execute(String query) throws Exception {
     String brokerHostPort = _brokerSelector.selectBroker(null);
-    _channelPoolMap.computeIfAbsent(brokerHostPort,
-        (Function<? super String, ? extends BrokerConnectionPool>) BrokerConnectionPool.createNewPool(brokerHostPort, _config.perHostPoolSize));
+    BrokerConnectionPool brokerConnectionPool1 =
+        _channelPoolMap.computeIfAbsent(brokerHostPort, k -> {
+          try {
+            return BrokerConnectionPool.createNewPool(brokerHostPort, _config.perHostPoolSize);
+          } catch (Exception e) {
+            // logs
+          }
+          return null;
+        });
     BrokerConnectionPool brokerConnectionPool = _channelPoolMap.get(brokerHostPort);
     return brokerConnectionPool.execute(query);
   }
