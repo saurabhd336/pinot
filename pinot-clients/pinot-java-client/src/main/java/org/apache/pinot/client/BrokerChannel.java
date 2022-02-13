@@ -49,6 +49,7 @@ public class BrokerChannel {
 
     ObjectNode json = JsonNodeFactory.instance.objectNode();
     json.put("sql", query);
+    json.put("queryOptions", "groupByMode=sql;responseFormat=sql");
 
 
     request.headers().set(HttpHeaderNames.HOST, _host);
