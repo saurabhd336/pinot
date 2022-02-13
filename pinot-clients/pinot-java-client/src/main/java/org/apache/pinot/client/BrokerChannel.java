@@ -1,5 +1,8 @@
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -44,12 +47,16 @@ public class BrokerChannel {
     FullHttpRequest request = new DefaultFullHttpRequest(
         HttpVersion.HTTP_1_1, HttpMethod.POST, "/query/sql");
 
+    ObjectNode json = JsonNodeFactory.instance.objectNode();
+    json.put("sql", query);
+
+
     request.headers().set(HttpHeaderNames.HOST, _host);
     request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE); // or HttpHeaders.Values.CLOSE
     request.headers().set(HttpHeaderNames.ACCEPT_ENCODING, HttpHeaderValues.GZIP);
     request.headers().set(HttpHeaderNames.ACCEPT, "application/json");
     request.headers().add(HttpHeaderNames.CONTENT_TYPE, "application/json");
-    ByteBuf bbuf = Unpooled.copiedBuffer(query, StandardCharsets.UTF_8);
+    ByteBuf bbuf = Unpooled.copiedBuffer(json.toString(), StandardCharsets.UTF_8);
     request.headers().set(HttpHeaderNames.CONTENT_LENGTH, bbuf.readableBytes());
     request.content().clear().writeBytes(bbuf);
 
