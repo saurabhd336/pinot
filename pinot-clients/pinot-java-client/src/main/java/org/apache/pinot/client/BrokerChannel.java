@@ -44,7 +44,7 @@ public class BrokerChannel {
 
   public Future<ResultSetGroup> executeQuery(String query) {
     FullHttpRequest request = new DefaultFullHttpRequest(
-        HttpVersion.HTTP_1_1, HttpMethod.POST, "/query/sql");
+        HttpVersion.HTTP_1_1, HttpMethod.POST, "/sql");
 
     ObjectNode json = JsonNodeFactory.instance.objectNode();
     json.put("sql", query);
