@@ -43,8 +43,22 @@ public class ConnectionFactory {
     return fromZookeeper(zkUrl, getDefault());
   }
 
-  public static Connection fromController(String controllerHost, int controllerPort) {
-    return new Connection(new Properties(), new ControllerBrokerSelector(controllerHost, controllerPort), getDefault());
+  /**
+   * Creates a connection to Pinot cluster, given its Controller URL
+   *
+   * @param scheme controller URL scheme
+   * @param controllerHost controller host
+   * @param controllerPort controller port
+   * @return A connection that connects to brokers as per the given controller
+   */
+  public static Connection fromController(String scheme, String controllerHost, int controllerPort) {
+    return fromController(scheme, controllerHost, controllerPort, 1000);
+  }
+
+  public static Connection fromController(String scheme, String controllerHost,
+      int controllerPort, long brokerUpdateFreqInMillis) {
+    return new Connection(new Properties(),
+        new ControllerBrokerSelector(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis), getDefault());
   }
 
   /**

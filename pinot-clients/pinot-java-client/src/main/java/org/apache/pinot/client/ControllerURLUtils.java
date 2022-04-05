@@ -16,26 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.client;
 
-import org.testng.annotations.Test;
-
-
-public class ControllerBrokerSelectorTest {
-  @Test
-  public void testControllerConnection() {
-//    BrokerSelector brokerSelector = new ControllerBrokerSelector("localhost")
+/**
+ * Util class for Controller APIs
+ */
+public class ControllerURLUtils {
+  private ControllerURLUtils() {
+    //not called
   }
+  // Other URLs to follow
+  private static final String TABLE_TO_BROKER_MAP_URL_FORMAT = "%s://%s:%d/v2/brokers/tables";
 
-  public static void main(String[] args) {
-    String scheme = "http";
-    String controllerHost = "localhost";
-    int controllerPort = 9000;
-
-    Connection connection = ConnectionFactory.fromController(scheme, controllerHost, controllerPort);
-    String tableName = "transcript";
-    ResultSetGroup resultSetGroup = connection.execute(tableName, "select * from transcript");
-    System.out.println(resultSetGroup);
-    connection.close();
+  public static String getTableBrokerUrl(String scheme, String controllerHost, int controllerPort) {
+    return String.format(TABLE_TO_BROKER_MAP_URL_FORMAT, scheme, controllerHost, controllerPort);
   }
 }

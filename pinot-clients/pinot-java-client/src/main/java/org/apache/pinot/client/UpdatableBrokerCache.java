@@ -18,24 +18,17 @@
  */
 package org.apache.pinot.client;
 
-import org.testng.annotations.Test;
+import java.util.List;
 
 
-public class ControllerBrokerSelectorTest {
-  @Test
-  public void testControllerConnection() {
-//    BrokerSelector brokerSelector = new ControllerBrokerSelector("localhost")
-  }
+public interface UpdatableBrokerCache {
+  void init();
 
-  public static void main(String[] args) {
-    String scheme = "http";
-    String controllerHost = "localhost";
-    int controllerPort = 9000;
+  String getBroker(String tableName);
 
-    Connection connection = ConnectionFactory.fromController(scheme, controllerHost, controllerPort);
-    String tableName = "transcript";
-    ResultSetGroup resultSetGroup = connection.execute(tableName, "select * from transcript");
-    System.out.println(resultSetGroup);
-    connection.close();
-  }
+  List<String> getBrokers();
+
+  void triggerBrokerCacheUpdate() throws Exception;
+
+  void close();
 }

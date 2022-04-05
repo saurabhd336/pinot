@@ -16,26 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.pinot.client;
 
-import org.testng.annotations.Test;
+import java.util.List;
 
 
-public class ControllerBrokerSelectorTest {
-  @Test
-  public void testControllerConnection() {
-//    BrokerSelector brokerSelector = new ControllerBrokerSelector("localhost")
+/**
+ * Controller based broker cache that only supports manual refresh
+ */
+public class ManuallyUpdatableBrokerCache implements UpdatableBrokerCache {
+  private final PollingBasedBrokerCache _pollingBasedBrokerCache;
+
+  public ManuallyUpdatableBrokerCache(String scheme, String controllerHost, int controllerPort) {
+    _pollingBasedBrokerCache = new PollingBasedBrokerCache(scheme, controllerHost, controllerPort);
   }
 
-  public static void main(String[] args) {
-    String scheme = "http";
-    String controllerHost = "localhost";
-    int controllerPort = 9000;
+  public void init() { }
 
-    Connection connection = ConnectionFactory.fromController(scheme, controllerHost, controllerPort);
-    String tableName = "transcript";
-    ResultSetGroup resultSetGroup = connection.execute(tableName, "select * from transcript");
-    System.out.println(resultSetGroup);
-    connection.close();
+  @Override
+  public String getBroker(String tableName) {
+    return _pollingBasedBrokerCache.getBroker(tableName);
+  }
+
+  @Override
+  public List<String> getBrokers() {
+    return _pollingBasedBrokerCache.getBrokers();
+  }
+
+  @Override
+  public void triggerBrokerCacheUpdate() throws Exception {
+    _pollingBasedBrokerCache.updateBrokerData();
+  }
+
+  @Override
+  public void close() {
   }
 }
