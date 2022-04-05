@@ -58,7 +58,8 @@ public class ConnectionFactory {
   public static Connection fromController(String scheme, String controllerHost,
       int controllerPort, long brokerUpdateFreqInMillis) {
     return new Connection(new Properties(),
-        new ControllerBrokerSelector(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis), getDefault());
+        new ControllerBasedBrokerSelector(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis),
+        getDefault());
   }
 
   /**

@@ -25,10 +25,10 @@ import java.util.List;
 /**
  * Maintains broker cache using controller APIs
  */
-public class ControllerBrokerSelector implements BrokerSelector {
+public class ControllerBasedBrokerSelector implements BrokerSelector {
     private final UpdatableBrokerCache _brokerCache;
 
-    public ControllerBrokerSelector(String scheme, String controllerHost,
+    public ControllerBasedBrokerSelector(String scheme, String controllerHost,
         int controllerPort, long brokerUpdateFreqInMillis) {
         // TODO pass the broker cache type via props
         _brokerCache = new ScheduledBrokerCache(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis);
