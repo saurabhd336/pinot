@@ -37,6 +37,7 @@ import org.asynchttpclient.Response;
 
 /**
  * Maintains table -> list of brokers, supports update
+ * TODO can we introduce a simple websocket based controller endpoint to make the update reactive in the client?
  */
 public class PollingBasedBrokerCache {
 
