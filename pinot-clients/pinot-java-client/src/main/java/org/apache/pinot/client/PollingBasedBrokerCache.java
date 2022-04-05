@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,15 +40,13 @@ import org.asynchttpclient.Response;
  */
 public class PollingBasedBrokerCache {
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private static class BrokerInstance {
     @JsonProperty("host")
     public String _host;
 
     @JsonProperty("port")
     public int _port;
-
-    @JsonProperty("instanceName")
-    public String _instanceName;
   }
 
   public static class BrokerData {
