@@ -28,27 +28,28 @@ import org.slf4j.LoggerFactory;
 /**
  * Maintains broker cache this is updated periodically
  */
-public class ScheduledBrokerCache implements UpdatableBrokerCache {
-  private final PollingBasedBrokerCache _pollingBasedBrokerCache;
+public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
+  private final BrokerCache _brokerCache;
   private final ScheduledExecutorService _scheduledExecutorService;
   private final long _brokerUpdateFreqInMillis;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ScheduledBrokerCache.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerCacheUpdaterPeriodic.class);
 
-  public ScheduledBrokerCache(String scheme, String controllerHost, int controllerPort, long brokerUpdateFreqInMillis) {
-    _pollingBasedBrokerCache = new PollingBasedBrokerCache(scheme, controllerHost, controllerPort);
+  public BrokerCacheUpdaterPeriodic(String scheme, String controllerHost,
+      int controllerPort, long brokerUpdateFreqInMillis) {
+    _brokerCache = new BrokerCache(scheme, controllerHost, controllerPort);
     _scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     _brokerUpdateFreqInMillis = brokerUpdateFreqInMillis;
   }
 
   public void init() {
     try {
-      _pollingBasedBrokerCache.updateBrokerData();
+      _brokerCache.updateBrokerData();
       _scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
         @Override
         public void run() {
           try {
-            _pollingBasedBrokerCache.updateBrokerData();
+            _brokerCache.updateBrokerData();
           } catch (Exception e) {
             LOGGER.error("Broker cache update failed", e);
           }
@@ -60,12 +61,12 @@ public class ScheduledBrokerCache implements UpdatableBrokerCache {
   }
 
   public String getBroker(String tableName) {
-    return _pollingBasedBrokerCache.getBroker(tableName);
+    return _brokerCache.getBroker(tableName);
   }
 
   @Override
   public List<String> getBrokers() {
-    return _pollingBasedBrokerCache.getBrokers();
+    return _brokerCache.getBrokers();
   }
 
   @Override

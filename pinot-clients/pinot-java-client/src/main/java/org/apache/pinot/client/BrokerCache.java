@@ -39,7 +39,7 @@ import org.asynchttpclient.Response;
  * Maintains table -> list of brokers, supports update
  * TODO can we introduce a simple websocket based controller endpoint to make the update reactive in the client?
  */
-public class PollingBasedBrokerCache {
+public class BrokerCache {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static class BrokerInstance {
@@ -68,7 +68,7 @@ public class PollingBasedBrokerCache {
       new TypeReference<Map<String, List<BrokerInstance>>>() { };
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  public PollingBasedBrokerCache(String scheme, String controllerHost, int controllerPort) {
+  public BrokerCache(String scheme, String controllerHost, int controllerPort) {
     _client = Dsl.asyncHttpClient();
     _address = ControllerURLUtils.getTableBrokerUrl(scheme, controllerHost, controllerPort);
   }

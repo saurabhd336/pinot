@@ -31,7 +31,7 @@ public class ControllerBasedBrokerSelector implements BrokerSelector {
     public ControllerBasedBrokerSelector(String scheme, String controllerHost,
         int controllerPort, long brokerUpdateFreqInMillis) {
         // TODO pass the broker cache type via props
-        _brokerCache = new ScheduledBrokerCache(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis);
+        _brokerCache = new BrokerCacheUpdaterPeriodic(scheme, controllerHost, controllerPort, brokerUpdateFreqInMillis);
         _brokerCache.init();
     }
 

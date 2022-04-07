@@ -25,28 +25,28 @@ import java.util.List;
 /**
  * Controller based broker cache that only supports manual refresh
  */
-public class ManuallyUpdatableBrokerCache implements UpdatableBrokerCache {
-  private final PollingBasedBrokerCache _pollingBasedBrokerCache;
+public class BrokerCacheUpdaterManual implements UpdatableBrokerCache {
+  private final BrokerCache _brokerCache;
 
-  public ManuallyUpdatableBrokerCache(String scheme, String controllerHost, int controllerPort) {
-    _pollingBasedBrokerCache = new PollingBasedBrokerCache(scheme, controllerHost, controllerPort);
+  public BrokerCacheUpdaterManual(String scheme, String controllerHost, int controllerPort) {
+    _brokerCache = new BrokerCache(scheme, controllerHost, controllerPort);
   }
 
   public void init() { }
 
   @Override
   public String getBroker(String tableName) {
-    return _pollingBasedBrokerCache.getBroker(tableName);
+    return _brokerCache.getBroker(tableName);
   }
 
   @Override
   public List<String> getBrokers() {
-    return _pollingBasedBrokerCache.getBrokers();
+    return _brokerCache.getBrokers();
   }
 
   @Override
   public void triggerBrokerCacheUpdate() throws Exception {
-    _pollingBasedBrokerCache.updateBrokerData();
+    _brokerCache.updateBrokerData();
   }
 
   @Override
