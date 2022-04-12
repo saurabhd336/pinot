@@ -22,7 +22,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.utils.URIUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

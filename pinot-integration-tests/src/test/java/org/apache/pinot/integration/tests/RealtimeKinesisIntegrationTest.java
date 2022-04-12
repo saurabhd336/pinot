@@ -49,7 +49,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.ResultSet;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConfig;
 import org.apache.pinot.plugin.stream.kinesis.KinesisConsumerFactory;
 import org.apache.pinot.spi.config.table.TableConfig;

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Future;
+import org.apache.pinot.spi.utils.ControllerRequestURLBuilder;
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.BoundRequestBuilder;
 import org.asynchttpclient.Dsl;
@@ -70,7 +71,9 @@ public class BrokerCache {
 
   public BrokerCache(String scheme, String controllerHost, int controllerPort) {
     _client = Dsl.asyncHttpClient();
-    _address = ControllerURLUtils.getTableBrokerUrl(scheme, controllerHost, controllerPort);
+    ControllerRequestURLBuilder controllerRequestURLBuilder =
+        ControllerRequestURLBuilder.baseUrl(scheme + "://" + controllerHost + ":" + controllerPort + "/v2");
+    _address = controllerRequestURLBuilder.forBrokerTablesGet(null);
   }
 
   protected void updateBrokerData() throws Exception {

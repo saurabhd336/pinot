@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.utils.URIUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 

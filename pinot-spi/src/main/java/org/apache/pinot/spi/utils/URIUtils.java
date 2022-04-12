@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.spi.utils;
 
 import java.io.File;
 import java.net.URI;
@@ -26,8 +26,6 @@ import java.net.URLEncoder;
 import java.util.Map;
 import java.util.StringJoiner;
 import org.apache.http.client.utils.URIBuilder;
-import org.apache.pinot.spi.utils.CommonConstants;
-
 
 public class URIUtils {
   private URIUtils() {

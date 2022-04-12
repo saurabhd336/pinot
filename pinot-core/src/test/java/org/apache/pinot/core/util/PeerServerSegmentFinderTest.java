@@ -28,7 +28,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;

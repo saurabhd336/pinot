@@ -23,7 +23,7 @@ import java.net.URI;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;

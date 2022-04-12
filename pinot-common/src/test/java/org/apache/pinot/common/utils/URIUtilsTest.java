@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.spi.utils.URIUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

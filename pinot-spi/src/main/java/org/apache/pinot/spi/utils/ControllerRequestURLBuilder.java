@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.helix;
+package org.apache.pinot.spi.utils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -26,9 +26,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 

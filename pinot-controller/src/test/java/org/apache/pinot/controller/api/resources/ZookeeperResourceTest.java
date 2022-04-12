@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.apache.helix.ZNRecord;
-import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.spi.utils.URIUtils;
 import org.apache.pinot.controller.ControllerTestUtils;
 import org.codehaus.jackson.type.TypeReference;
 import org.testng.Assert;
