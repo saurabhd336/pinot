@@ -33,7 +33,7 @@ public class CommonConstants {
   public static final String HTTP_PROTOCOL = "http";
   public static final String HTTPS_PROTOCOL = "https";
 
-  public static final String KEY_OF_AUTH_TOKEN = "auth.token";
+  public static final String KEY_OF_AUTH = "auth";
 
   public static final String TABLE_NAME = "tableName";
 
@@ -200,6 +200,7 @@ public class CommonConstants {
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
+    public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
@@ -230,6 +231,7 @@ public class CommonConstants {
     public static final String BROKER_SERVICE_AUTO_DISCOVERY = "pinot.broker.service.auto.discovery";
 
     public static final String DISABLE_GROOVY = "pinot.broker.disable.query.groovy";
+    public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
     // Rewrite potential expensive functions to their approximation counterparts
     // - DISTINCT_COUNT -> DISTINCT_COUNT_SMART_HLL
@@ -247,10 +249,14 @@ public class CommonConstants {
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
         public static final String SKIP_UPSERT = "skipUpsert";
+        public static final String USE_STAR_TREE = "useStarTree";
+        public static final String ROUTING_OPTIONS = "routingOptions";
+        public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+        public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
@@ -259,6 +265,10 @@ public class CommonConstants {
         public static final String RESPONSE_FORMAT = "responseFormat";
         @Deprecated
         public static final String GROUP_BY_MODE = "groupByMode";
+      }
+
+      public static class QueryOptionValue {
+        public static final String ROUTING_FORCE_HLC = "FORCE_HLC";
       }
     }
 
@@ -307,7 +317,7 @@ public class CommonConstants {
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
-    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = false;
+    public static final boolean DEFAULT_ENABLE_GRPC_SERVER = true;
     public static final String CONFIG_OF_GRPC_PORT = "pinot.server.grpc.port";
     public static final int DEFAULT_GRPC_PORT = 8090;
     public static final String CONFIG_OF_GRPCTLS_SERVER_ENABLED = "pinot.server.grpctls.enabled";
@@ -316,6 +326,7 @@ public class CommonConstants {
     public static final boolean DEFAULT_NETTYTLS_SERVER_ENABLED = false;
     public static final String CONFIG_OF_SWAGGER_SERVER_ENABLED = "pinot.server.swagger.enabled";
     public static final boolean DEFAULT_SWAGGER_SERVER_ENABLED = true;
+    public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.server.swagger.use.https";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
@@ -336,7 +347,7 @@ public class CommonConstants {
      * Service token for accessing protected controller APIs.
      * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
      */
-    public static final String CONFIG_OF_AUTH_TOKEN = KEY_OF_AUTH_TOKEN;
+    public static final String CONFIG_OF_AUTH = KEY_OF_AUTH;
 
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
@@ -437,7 +448,7 @@ public class CommonConstants {
        * Service token for accessing protected controller APIs.
        * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
        */
-      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH_TOKEN = KEY_OF_AUTH_TOKEN;
+      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH = KEY_OF_AUTH;
 
       public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
       public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
@@ -494,6 +505,7 @@ public class CommonConstants {
     public static final String METADATA_EVENT_OBSERVER_PREFIX = "metadata.event.notifier";
 
     // Config keys
+    public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.minion.swagger.use.https";
     public static final String CONFIG_OF_METRICS_PREFIX_KEY = "pinot.minion.metrics.prefix";
     @Deprecated
     public static final String DEPRECATED_CONFIG_OF_METRICS_PREFIX_KEY = "metricsPrefix";
@@ -532,11 +544,16 @@ public class CommonConstants {
   public static class Segment {
     public static class Realtime {
       public enum Status {
-        // Means the segment is in CONSUMING state.
-        IN_PROGRESS, // Means the segment is in ONLINE state (segment completed consuming and has been saved in
-        // segment store).
-        DONE, // Means the segment is uploaded to a Pinot controller by an external party.
-        UPLOADED
+        IN_PROGRESS, // The segment is still consuming data
+        DONE, // The segment has finished consumption and has been committed to the segment store
+        UPLOADED; // The segment is uploaded by an external party
+
+        /**
+         * Returns {@code true} if the segment is completed (DONE/UPLOADED), {@code false} otherwise.
+         */
+        public boolean isCompleted() {
+          return this != IN_PROGRESS;
+        }
       }
 
       /**

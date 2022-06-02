@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.CompletionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -99,6 +100,7 @@ public class TableConfigBuilder {
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
+  private boolean _aggregateMetrics;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -109,6 +111,7 @@ public class TableConfigBuilder {
   private List<FieldConfig> _fieldConfigList;
 
   private UpsertConfig _upsertConfig;
+  private DedupConfig _dedupConfig;
   private IngestionConfig _ingestionConfig;
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
@@ -284,6 +287,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setAggregateMetrics(boolean aggregateMetrics) {
+    _aggregateMetrics = aggregateMetrics;
+    return this;
+  }
+
   public TableConfigBuilder setStreamConfigs(Map<String, String> streamConfigs) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
     _streamConfigs = streamConfigs;
@@ -338,6 +346,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setUpsertConfig(UpsertConfig upsertConfig) {
     _upsertConfig = upsertConfig;
+    return this;
+  }
+
+  public TableConfigBuilder setDedupConfig(DedupConfig dedupConfig) {
+    _dedupConfig = dedupConfig;
     return this;
   }
 
@@ -404,6 +417,7 @@ public class TableConfigBuilder {
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
+    indexingConfig.setAggregateMetrics(_aggregateMetrics);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
@@ -411,6 +425,7 @@ public class TableConfigBuilder {
 
     return new TableConfig(_tableName, _tableType.toString(), validationConfig, tenantConfig, indexingConfig,
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
-        _fieldConfigList, _upsertConfig, _ingestionConfig, _tierConfigList, _isDimTable, _tunerConfigList);
+        _fieldConfigList, _upsertConfig, _dedupConfig, _ingestionConfig, _tierConfigList, _isDimTable,
+        _tunerConfigList);
   }
 }

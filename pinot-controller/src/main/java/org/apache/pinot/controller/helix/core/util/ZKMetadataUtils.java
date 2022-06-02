@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
@@ -38,11 +40,10 @@ public class ZKMetadataUtils {
    * Creates the segment ZK metadata for a new segment.
    */
   public static SegmentZKMetadata createSegmentZKMetadata(String tableNameWithType, SegmentMetadata segmentMetadata,
-      String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
+      String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
-    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypter,
-        segmentSizeInBytes);
-    segmentZKMetadata.setPushTime(System.currentTimeMillis());
+    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
+        segmentSizeInBytes, true);
     return segmentZKMetadata;
   }
 
@@ -50,14 +51,20 @@ public class ZKMetadataUtils {
    * Refreshes the segment ZK metadata for a segment being replaced.
    */
   public static void refreshSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
-      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
-    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypter,
-        segmentSizeInBytes);
-    segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes) {
+    updateSegmentZKMetadata(tableNameWithType, segmentZKMetadata, segmentMetadata, downloadUrl, crypterName,
+        segmentSizeInBytes, false);
   }
 
   private static void updateSegmentZKMetadata(String tableNameWithType, SegmentZKMetadata segmentZKMetadata,
-      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypter, long segmentSizeInBytes) {
+      SegmentMetadata segmentMetadata, String downloadUrl, @Nullable String crypterName, long segmentSizeInBytes,
+      boolean newSegment) {
+    if (newSegment) {
+      segmentZKMetadata.setPushTime(System.currentTimeMillis());
+    } else {
+      segmentZKMetadata.setRefreshTime(System.currentTimeMillis());
+    }
+
     if (segmentMetadata.getTimeInterval() != null) {
       segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
       segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
@@ -67,17 +74,14 @@ public class ZKMetadataUtils {
       segmentZKMetadata.setEndTime(-1);
       segmentZKMetadata.setTimeUnit(null);
     }
-    if (segmentMetadata.getVersion() != null) {
-      segmentZKMetadata.setIndexVersion(segmentMetadata.getVersion().name());
-    } else {
-      segmentZKMetadata.setIndexVersion(null);
-    }
+    segmentZKMetadata.setIndexVersion(
+        segmentMetadata.getVersion() != null ? segmentMetadata.getVersion().name() : null);
     segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
     segmentZKMetadata.setSizeInBytes(segmentSizeInBytes);
     segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
     segmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
     segmentZKMetadata.setDownloadUrl(downloadUrl);
-    segmentZKMetadata.setCrypterName(crypter);
+    segmentZKMetadata.setCrypterName(crypterName);
 
     // Set partition metadata
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
@@ -90,11 +94,8 @@ public class ZKMetadataUtils {
         columnPartitionMap.put(column, columnPartitionMetadata);
       }
     });
-    if (!columnPartitionMap.isEmpty()) {
-      segmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
-    } else {
-      segmentZKMetadata.setPartitionMetadata(null);
-    }
+    segmentZKMetadata.setPartitionMetadata(
+        !columnPartitionMap.isEmpty() ? new SegmentPartitionMetadata(columnPartitionMap) : null);
 
     // Update custom metadata
     // NOTE: Do not remove existing keys because they can be set by the HTTP header from the segment upload request
@@ -109,6 +110,12 @@ public class ZKMetadataUtils {
     // Set fields specific to realtime table
     if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
       segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.UPLOADED);
+
+      // For new segment, start/end offset must exist if the segment name follows LLC segment name convention
+      if (newSegment && SegmentName.isLowLevelConsumerSegmentName(segmentMetadata.getName())) {
+        Preconditions.checkArgument(segmentMetadata.getStartOffset() != null && segmentMetadata.getEndOffset() != null,
+            "New uploaded LLC segment must have start/end offset in the segment metadata");
+      }
 
       // NOTE:
       // - If start/end offset is available in the uploaded segment, update them in the segment ZK metadata

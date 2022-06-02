@@ -24,13 +24,13 @@ import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.metrics.PinotMetricUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
@@ -180,7 +180,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -257,7 +257,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -614,7 +614,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -690,7 +690,7 @@ public class SegmentCompletionTest {
 
     _segmentCompletionMgr._seconds += 5;
     params = new Request.Params().withInstanceId(S_1).withStreamPartitionMsgOffset(_s1Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr
         .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
@@ -977,7 +977,7 @@ public class SegmentCompletionTest {
     // Commit in 15s
     _segmentCompletionMgr._seconds += 15;
     params = new Request.Params().withInstanceId(S_2).withStreamPartitionMsgOffset(_s2Offset.toString())
-        .withSegmentName(_segmentNameStr);
+        .withSegmentName(_segmentNameStr).withSegmentLocation("location");
     response = _segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     long commitTimeMs = (_segmentCompletionMgr._seconds - startTime) * 1000;
@@ -1346,10 +1346,6 @@ public class SegmentCompletionTest {
 
     @Override
     protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
-      return new LongMsgOffsetFactory();
-    }
-
-    public StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(String segmentName) {
       return new LongMsgOffsetFactory();
     }
 

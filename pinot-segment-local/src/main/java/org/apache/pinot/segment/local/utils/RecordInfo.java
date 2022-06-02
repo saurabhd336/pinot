@@ -16,34 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.segment.local.utils;
 
-import java.io.Serializable;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public class Pair<FIRST extends Serializable, SECOND extends Serializable> implements Serializable {
-  private FIRST _first;
-  private SECOND _second;
+public final class RecordInfo {
+  private final PrimaryKey _primaryKey;
+  private final int _docId;
+  private final Comparable _comparisonValue;
 
-  public FIRST getFirst() {
-    return _first;
+  public RecordInfo(PrimaryKey primaryKey, int docId, Comparable comparisonValue) {
+    _primaryKey = primaryKey;
+    _docId = docId;
+    _comparisonValue = comparisonValue;
   }
 
-  public void setFirst(FIRST first) {
-    _first = first;
+  public PrimaryKey getPrimaryKey() {
+    return _primaryKey;
   }
 
-  public SECOND getSecond() {
-    return _second;
+  public int getDocId() {
+    return _docId;
   }
 
-  public void setSecond(SECOND second) {
-    _second = second;
-  }
-
-  public Pair(FIRST first, SECOND second) {
-    super();
-    _first = first;
-    _second = second;
+  public Comparable getComparisonValue() {
+    return _comparisonValue;
   }
 }

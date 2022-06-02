@@ -16,24 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.plugin.stream.kafka20;
 
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
-/**
- * Adapter that causes metrics from a metric registry to be published to JMX.
- *
- */
-public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
-  private static final Logger LOGGER = LoggerFactory.getLogger(JmxReporterMetricsRegistryRegistrationListener.class);
-
-  @Override
-  public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
-    LOGGER.info("Registering JmxReporterMetricsRegistryRegistrationListener");
-    PinotMetricUtils.makePinotJmxReporter(metricsRegistry).start();
-    LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
+@FunctionalInterface
+public interface RowMetadataExtractor {
+  static RowMetadataExtractor build(boolean populateMetadata) {
+    return populateMetadata ? record -> new StreamMessageMetadata(record.timestamp()) : record -> null;
   }
+
+  RowMetadata extract(ConsumerRecord<?, ?> consumerRecord);
 }

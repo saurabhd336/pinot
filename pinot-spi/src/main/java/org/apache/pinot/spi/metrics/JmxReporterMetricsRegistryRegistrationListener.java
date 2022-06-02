@@ -16,30 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.pruner;
+package org.apache.pinot.spi.metrics;
 
-import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
- * the segment schema.
+ * Adapter that causes metrics from a metric registry to be published to JMX.
+ *
  */
-public class DataSchemaSegmentPruner implements SegmentPruner {
+public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JmxReporterMetricsRegistryRegistrationListener.class);
 
   @Override
-  public void init(PinotConfiguration config) {
-  }
-
-  @Override
-  public boolean prune(IndexSegment segment, QueryContext query) {
-    return !segment.getColumnNames().containsAll(query.getColumns());
-  }
-
-  @Override
-  public String toString() {
-    return "DataSchemaSegmentPruner";
+  public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
+    LOGGER.info("Registering JmxReporterMetricsRegistryRegistrationListener");
+    PinotMetricUtils.makePinotJmxReporter(metricsRegistry).start();
+    LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
   }
 }

@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -70,6 +69,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.core.util.QueryOptionsUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
@@ -133,7 +133,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _queryQuotaManager = queryQuotaManager;
     _tableCache = tableCache;
     _brokerMetrics = brokerMetrics;
-    _disableGroovy = _config.getProperty(CommonConstants.Broker.DISABLE_GROOVY, false);
+    _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
         CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
@@ -472,6 +472,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Map<ServerInstance, List<String>> offlineRoutingTable = null;
     Map<ServerInstance, List<String>> realtimeRoutingTable = null;
     List<String> unavailableSegments = new ArrayList<>();
+    int numPrunedSegmentsTotal = 0;
     if (offlineBrokerRequest != null) {
       // NOTE: Routing table might be null if table is just removed
       RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest);
@@ -483,6 +484,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         } else {
           offlineBrokerRequest = null;
         }
+        numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
         offlineBrokerRequest = null;
       }
@@ -498,6 +500,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         } else {
           realtimeBrokerRequest = null;
         }
+        numPrunedSegmentsTotal += routingTable.getNumPrunedSegments();
       } else {
         realtimeBrokerRequest = null;
       }
@@ -547,15 +550,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Execute the query
     ServerStats serverStats = new ServerStats();
-    if (serverPinotQuery.isExplain()) {
-      // Update routing tables to only send request to 1 server (& generate the plan for 1 segment).
+    // TODO: Handle broker specific operations for explain plan queries such as:
+    //       - Alias handling
+    //       - Compile time function invocation
+    //       - Literal only queries
+    //       - Any rewrites
+    if (pinotQuery.isExplain()) {
+      // Update routing tables to only send request to offline servers for OFFLINE and HYBRID tables.
+      // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
       if (offlineRoutingTable != null) {
-        setRoutingToOneSegment(offlineRoutingTable);
         // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
-      } else {
-        setRoutingToOneSegment(realtimeRoutingTable);
       }
     }
     // TODO: Modify processBrokerRequest() to directly take PinotQuery
@@ -563,6 +569,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
             realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     brokerResponse.setExceptions(exceptions);
+    brokerResponse.setNumSegmentsPrunedByBroker(numPrunedSegmentsTotal);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -637,15 +644,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     function.getOperands()
         .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
-  }
-
-  /** Set EXPLAIN PLAN query to route to only one segment on one server. */
-  private void setRoutingToOneSegment(Map<ServerInstance, List<String>> routingTable) {
-    Set<Map.Entry<ServerInstance, List<String>>> servers = routingTable.entrySet();
-    // only send request to 1 server
-    Map.Entry<ServerInstance, List<String>> server = servers.iterator().next();
-    routingTable.clear();
-    routingTable.put(server.getKey(), Collections.singletonList(server.getValue().get(0)));
   }
 
   /** Given a {@link PinotQuery}, check if the WHERE clause will always evaluate to false. */
@@ -1007,37 +1005,44 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   private HandlerContext getHandlerContext(@Nullable TableConfig offlineTableConfig,
       @Nullable TableConfig realtimeTableConfig) {
-    boolean offlineTableDisableGroovyQuery = _disableGroovy;
-    boolean offlineTableUseApproximateFunction = _useApproximateFunction;
+    Boolean disableGroovyOverride = null;
+    Boolean useApproximateFunctionOverride = null;
     if (offlineTableConfig != null && offlineTableConfig.getQueryConfig() != null) {
-      Boolean disableGroovyOverride = offlineTableConfig.getQueryConfig().getDisableGroovy();
-      if (disableGroovyOverride != null) {
-        offlineTableDisableGroovyQuery = disableGroovyOverride;
+      QueryConfig offlineTableQueryConfig = offlineTableConfig.getQueryConfig();
+      Boolean disableGroovyOfflineTableOverride = offlineTableQueryConfig.getDisableGroovy();
+      if (disableGroovyOfflineTableOverride != null) {
+        disableGroovyOverride = disableGroovyOfflineTableOverride;
       }
-      Boolean useApproximateFunctionOverride = offlineTableConfig.getQueryConfig().getUseApproximateFunction();
-      if (useApproximateFunctionOverride != null) {
-        offlineTableUseApproximateFunction = useApproximateFunctionOverride;
+      Boolean useApproximateFunctionOfflineTableOverride = offlineTableQueryConfig.getUseApproximateFunction();
+      if (useApproximateFunctionOfflineTableOverride != null) {
+        useApproximateFunctionOverride = useApproximateFunctionOfflineTableOverride;
       }
     }
-
-    boolean realtimeTableDisableGroovyQuery = _disableGroovy;
-    boolean realtimeTableUseApproximateFunction = _useApproximateFunction;
     if (realtimeTableConfig != null && realtimeTableConfig.getQueryConfig() != null) {
-      Boolean disableGroovyOverride = realtimeTableConfig.getQueryConfig().getDisableGroovy();
-      if (disableGroovyOverride != null) {
-        realtimeTableDisableGroovyQuery = disableGroovyOverride;
+      QueryConfig realtimeTableQueryConfig = realtimeTableConfig.getQueryConfig();
+      Boolean disableGroovyRealtimeTableOverride = realtimeTableQueryConfig.getDisableGroovy();
+      if (disableGroovyRealtimeTableOverride != null) {
+        if (disableGroovyOverride == null) {
+          disableGroovyOverride = disableGroovyRealtimeTableOverride;
+        } else {
+          // Disable Groovy if either offline or realtime table config disables Groovy
+          disableGroovyOverride |= disableGroovyRealtimeTableOverride;
+        }
       }
-      Boolean useApproximateFunctionOverride = realtimeTableConfig.getQueryConfig().getUseApproximateFunction();
-      if (useApproximateFunctionOverride != null) {
-        realtimeTableUseApproximateFunction = useApproximateFunctionOverride;
+      Boolean useApproximateFunctionRealtimeTableOverride = realtimeTableQueryConfig.getUseApproximateFunction();
+      if (useApproximateFunctionRealtimeTableOverride != null) {
+        if (useApproximateFunctionOverride == null) {
+          useApproximateFunctionOverride = useApproximateFunctionRealtimeTableOverride;
+        } else {
+          // Use approximate function if both offline and realtime table config uses approximate function
+          useApproximateFunctionOverride &= useApproximateFunctionRealtimeTableOverride;
+        }
       }
     }
 
-    // Disable Groovy if either offline or realtime table config disables Groovy
-    boolean disableGroovy = offlineTableDisableGroovyQuery | realtimeTableDisableGroovyQuery;
-    // Use approximate function if both offline and realtime table config uses approximate function
-    boolean useApproximateFunction = offlineTableUseApproximateFunction & realtimeTableUseApproximateFunction;
-
+    boolean disableGroovy = disableGroovyOverride != null ? disableGroovyOverride : _disableGroovy;
+    boolean useApproximateFunction =
+        useApproximateFunctionOverride != null ? useApproximateFunctionOverride : _useApproximateFunction;
     return new HandlerContext(disableGroovy, useApproximateFunction);
   }
 
@@ -1475,6 +1480,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @VisibleForTesting
   static void setOptions(PinotQuery pinotQuery, long requestId, String query, JsonNode jsonRequest) {
     Map<String, String> queryOptions = new HashMap<>();
+    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
+      if (!debugOptions.isEmpty()) {
+        // TODO: Do not set debug options after releasing 0.11.0. Currently we kept it for backward compatibility.
+        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
+        pinotQuery.setDebugOptions(debugOptions);
+
+        // NOTE: Debug options are deprecated. Put all debug options into query options for backward compatibility.
+        queryOptions.putAll(debugOptions);
+      }
+    }
     if (jsonRequest.has(Broker.Request.QUERY_OPTIONS)) {
       Map<String, String> queryOptionsFromJson = getOptionsFromJson(jsonRequest, Broker.Request.QUERY_OPTIONS);
       queryOptions.putAll(queryOptionsFromJson);
@@ -1491,14 +1507,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     pinotQuery.setQueryOptions(queryOptions);
     if (!queryOptions.isEmpty()) {
       LOGGER.debug("Query options are set to: {} for request {}: {}", queryOptions, requestId, query);
-    }
-
-    if (jsonRequest.has(Broker.Request.DEBUG_OPTIONS)) {
-      Map<String, String> debugOptions = getOptionsFromJson(jsonRequest, Broker.Request.DEBUG_OPTIONS);
-      if (!debugOptions.isEmpty()) {
-        LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
-        pinotQuery.setDebugOptions(debugOptions);
-      }
     }
   }
 

@@ -247,7 +247,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected void addSchema(Schema schema)
+  public void addSchema(Schema schema)
       throws IOException {
     SimpleHttpResponse response =
         sendMultipartPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString(),
@@ -256,7 +256,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected void addTableConfig(TableConfig tableConfig)
+  public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonString(), AUTH_HEADER);
   }
@@ -276,7 +276,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Override
-  protected void dropRealtimeTable(String tableName)
+  public void dropRealtimeTable(String tableName)
       throws IOException {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)),
@@ -463,6 +463,13 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
         Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
       }
     }
+  }
+
+  @Test(expectedExceptions = IOException.class)
+  public void testUnauthenticatedFailure()
+      throws IOException {
+    sendDeleteRequest(
+        _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType("mytable")));
   }
 
   @Test

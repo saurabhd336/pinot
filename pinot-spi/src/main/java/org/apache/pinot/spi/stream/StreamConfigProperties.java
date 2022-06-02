@@ -43,11 +43,13 @@ public class StreamConfigProperties {
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";
   public static final String STREAM_FETCH_TIMEOUT_MILLIS = "fetch.timeout.millis";
   public static final String STREAM_CONNECTION_TIMEOUT_MILLIS = "connection.timeout.millis";
+  public static final String STREAM_IDLE_TIMEOUT_MILLIS = "idle.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
   public static final String GROUP_ID = "hlc.group.id";
   public static final String PARTITION_MSG_OFFSET_FACTORY_CLASS = "partition.offset.factory.class.name";
   public static final String TOPIC_CONSUMPTION_RATE_LIMIT = "topic.consumption.rate.limit";
+  public static final String METADATA_POPULATE = "metadata.populate";
 
   /**
    * Time threshold that will keep the realtime segment open for before we complete the segment

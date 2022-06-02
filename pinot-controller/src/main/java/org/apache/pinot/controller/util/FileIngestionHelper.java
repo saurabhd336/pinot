@@ -19,13 +19,13 @@
 package org.apache.pinot.controller.util;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -35,7 +35,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.api.resources.SuccessResponse;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.spi.auth.AuthContext;
+import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -71,16 +71,16 @@ public class FileIngestionHelper {
   private final Map<String, String> _batchConfigMap;
   private final URI _controllerUri;
   private final File _uploadDir;
-  private final AuthContext _authContext;
+  private final AuthProvider _authProvider;
 
   public FileIngestionHelper(TableConfig tableConfig, Schema schema, Map<String, String> batchConfigMap,
-      URI controllerUri, File uploadDir, String authToken) {
+      URI controllerUri, File uploadDir, AuthProvider authProvider) {
     _tableConfig = tableConfig;
     _schema = schema;
     _batchConfigMap = batchConfigMap;
     _controllerUri = controllerUri;
     _uploadDir = uploadDir;
-    _authContext = new AuthContext(authToken);
+    _authProvider = authProvider;
   }
 
   /**
@@ -129,7 +129,7 @@ public class FileIngestionHelper {
         batchConfigMapOverride.put(segmentNamePostfixProp, String.valueOf(System.currentTimeMillis()));
       }
       BatchIngestionConfig batchIngestionConfigOverride =
-          new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
+          new BatchIngestionConfig(Collections.singletonList(batchConfigMapOverride),
               IngestionConfigUtils.getBatchSegmentIngestionType(_tableConfig),
               IngestionConfigUtils.getBatchSegmentIngestionFrequency(_tableConfig));
 
@@ -147,14 +147,14 @@ public class FileIngestionHelper {
       TarGzCompressionUtils.createTarGzFile(new File(outputDir, segmentName), segmentTarFile);
 
       // Upload segment
-      IngestionConfig ingestionConfigOverride =
-          new IngestionConfig(batchIngestionConfigOverride, null, null, null, null);
+      IngestionConfig ingestionConfigOverride = new IngestionConfig();
+      ingestionConfigOverride.setBatchIngestionConfig(batchIngestionConfigOverride);
       TableConfig tableConfigOverride =
           new TableConfigBuilder(_tableConfig.getTableType()).setTableName(_tableConfig.getTableName())
               .setIngestionConfig(ingestionConfigOverride).build();
       SegmentUploader segmentUploader = PluginManager.get().createInstance(SEGMENT_UPLOADER_CLASS);
       segmentUploader.init(tableConfigOverride);
-      segmentUploader.uploadSegment(segmentTarFile.toURI(), _authContext);
+      segmentUploader.uploadSegment(segmentTarFile.toURI(), _authProvider);
       LOGGER.info("Uploaded tar: {} to table: {}", segmentTarFile.getAbsolutePath(), tableNameWithType);
 
       return new SuccessResponse(

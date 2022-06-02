@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -55,6 +56,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -90,6 +92,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
+import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
@@ -133,6 +136,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -164,10 +168,11 @@ public class PinotHelixResourceManager {
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   public static final String APPEND = "APPEND";
   private static final int DEFAULT_TABLE_UPDATER_LOCKERS_SIZE = 100;
+  private static final String API_REQUEST_ID_PREFIX = "api-";
 
   // TODO: make this configurable
   public static final long EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS = 10 * 60_000L; // 10 minutes
-  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 secondL
+  public static final long EXTERNAL_VIEW_CHECK_INTERVAL_MS = 1_000L; // 1 second
 
   private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");
 
@@ -687,18 +692,6 @@ public class PinotHelixResourceManager {
     } else {
       return tableName;
     }
-  }
-
-  /**
-   * Returns the crypter class name defined in the table config for the given table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return crypter class name
-   */
-  public String getCrypterClassNameFromTableConfig(String tableNameWithType) {
-    TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
-    Preconditions.checkNotNull(tableConfig, "Table config is not available for table '%s'", tableNameWithType);
-    return tableConfig.getValidationConfig().getCrypterClassName();
   }
 
   /**
@@ -2009,26 +2002,14 @@ public class PinotHelixResourceManager {
   public void assignTableSegment(String tableNameWithType, String segmentName) {
     String segmentZKMetadataPath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName);
-    InstancePartitionsType instancePartitionsType;
-    if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
-      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
-      // TODO When upload segments is open to all realtime tables, we should change the type to COMPLETED instead.
-      // In addition, RealtimeSegmentAssignment.assignSegment(..) method should be updated so that the method does not
-      // assign segments to CONSUMING instance partition only.
-      instancePartitionsType = InstancePartitionsType.CONSUMING;
-    } else {
-      instancePartitionsType = InstancePartitionsType.OFFLINE;
-    }
 
     // Assign instances for the segment and add it into IdealState
     try {
       TableConfig tableConfig = getTableConfig(tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: " + tableNameWithType);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+          fetchOrComputeInstancePartitions(tableNameWithType, tableConfig);
       SegmentAssignment segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
-      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = Collections
-          .singletonMap(instancePartitionsType, InstancePartitionsUtils
-              .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
       synchronized (getTableUpdaterLock(tableNameWithType)) {
         HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
           assert idealState != null;
@@ -2060,6 +2041,35 @@ public class PinotHelixResourceManager {
       }
       throw e;
     }
+  }
+
+  private Map<InstancePartitionsType, InstancePartitions> fetchOrComputeInstancePartitions(String tableNameWithType,
+      TableConfig tableConfig) {
+    if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
+      return Collections.singletonMap(InstancePartitionsType.OFFLINE, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, InstancePartitionsType.OFFLINE));
+    }
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+      // In an upsert enabled LLC realtime table, all segments of the same partition are collocated on the same server
+      // -- consuming or completed. So it is fine to use CONSUMING as the InstancePartitionsType.
+      return Collections.singletonMap(InstancePartitionsType.CONSUMING, InstancePartitionsUtils
+          .fetchOrComputeInstancePartitions(_helixZkManager, tableConfig, InstancePartitionsType.CONSUMING));
+    }
+    // for non-upsert realtime tables, if COMPLETED instance partitions is available or tag override for
+    // completed segments is provided in the tenant config, COMPLETED instance partitions type is used
+    // otherwise CONSUMING instance partitions type is used.
+    InstancePartitionsType instancePartitionsType = InstancePartitionsType.COMPLETED;
+    InstancePartitions instancePartitions = InstancePartitionsUtils.fetchInstancePartitions(_propertyStore,
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+    if (instancePartitions != null) {
+      return Collections.singletonMap(instancePartitionsType, instancePartitions);
+    }
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig == null || tagOverrideConfig.getRealtimeCompleted() == null) {
+      instancePartitionsType = InstancePartitionsType.CONSUMING;
+    }
+    return Collections.singletonMap(instancePartitionsType,
+        InstancePartitionsUtils.computeDefaultInstancePartitions(_helixZkManager, tableConfig, instancePartitionsType));
   }
 
   public boolean isUpsertTable(String tableName) {
@@ -2496,6 +2506,21 @@ public class PinotHelixResourceManager {
     }
 
     return serverToSegmentsMap;
+  }
+
+  /**
+   * Returns a set of server instances for a given table and segment
+   */
+  public Set<String> getServers(String tableNameWithType, String segmentName) {
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
+
+    return idealState.getPartitionSet().stream()
+        .filter(segmentName::equals)
+        .flatMap(s -> idealState.getInstanceStateMap(s).keySet().stream())
+        .collect(Collectors.toSet());
   }
 
   /**
@@ -3537,6 +3562,40 @@ public class PinotHelixResourceManager {
     }
 
     return tableConfig.getValidationConfig().getReplicationNumber();
+  }
+
+  /**
+   * Trigger controller periodic task using helix messaging service
+   * @param tableName Name of table against which task is to be run
+   * @param periodicTaskName Task name
+   * @param taskProperties Extra properties to be passed along
+   * @return Task id for filtering logs, along with the number of successfully sent messages
+   */
+  public Pair<String, Integer> invokeControllerPeriodicTask(String tableName, String periodicTaskName,
+      Map<String, String> taskProperties) {
+    String periodicTaskRequestId = API_REQUEST_ID_PREFIX + UUID.randomUUID().toString().substring(0, 8);
+
+    LOGGER.info(
+        "[TaskRequestId: {}] Sending periodic task message to all controllers for running task {} against {},"
+            + " with properties {}.\"", periodicTaskRequestId, periodicTaskName,
+        tableName != null ? " table '" + tableName + "'" : "all tables", taskProperties);
+
+    // Create and send message to send to all controllers (including this one)
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    recipientCriteria.setSelfExcluded(false);
+    RunPeriodicTaskMessage runPeriodicTaskMessage =
+        new RunPeriodicTaskMessage(periodicTaskRequestId, periodicTaskName, tableName, taskProperties);
+
+    ClusterMessagingService clusterMessagingService = getHelixZkManager().getMessagingService();
+    int messageCount = clusterMessagingService.send(recipientCriteria, runPeriodicTaskMessage, null, -1);
+
+    LOGGER.info("[TaskRequestId: {}] Periodic task execution message sent to {} controllers.", periodicTaskRequestId,
+        messageCount);
+    return Pair.of(periodicTaskRequestId, messageCount);
   }
 
   /*

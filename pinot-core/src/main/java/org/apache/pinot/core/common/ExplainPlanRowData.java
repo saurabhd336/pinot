@@ -16,42 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.utils;
+package org.apache.pinot.core.common;
 
-import java.io.Serializable;
 import java.util.Objects;
 
+/**
+ * Class to hold the data for a single Explain plan row
+ */
+public class ExplainPlanRowData {
+  private final String _explainPlanString;
+  private final int _operatorId;
+  private final int _parentId;
 
-public class Pair<FIRST extends Serializable, SECOND extends Serializable> implements Serializable {
-  private static final long serialVersionUID = -2776898111501466320L;
-
-  private FIRST _first;
-  private SECOND _second;
-
-  public Pair(FIRST first, SECOND second) {
-    _first = first;
-    _second = second;
+  public ExplainPlanRowData(String explainPlanString, int operatorId, int parentId) {
+    _explainPlanString = explainPlanString;
+    _operatorId = operatorId;
+    _parentId = parentId;
   }
 
-  public FIRST getFirst() {
-    return _first;
+  public String getExplainPlanString() {
+    return _explainPlanString;
   }
 
-  public SECOND getSecond() {
-    return _second;
+  public int getOperatorId() {
+    return _operatorId;
   }
 
-  public void setFirst(FIRST first) {
-    _first = first;
-  }
-
-  public void setSecond(SECOND second) {
-    _second = second;
-  }
-
-  @Override
-  public String toString() {
-    return "first=" + _first + ", second=" + _second;
+  public int getParentId() {
+    return _parentId;
   }
 
   @Override
@@ -62,12 +54,13 @@ public class Pair<FIRST extends Serializable, SECOND extends Serializable> imple
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Pair<?, ?> pair = (Pair<?, ?>) o;
-    return Objects.equals(_first, pair._first) && Objects.equals(_second, pair._second);
+    ExplainPlanRowData that = (ExplainPlanRowData) o;
+    return _operatorId == that._operatorId && _parentId == that._parentId
+        && _explainPlanString.equals(that._explainPlanString);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_first, _second);
+    return Objects.hash(_explainPlanString, _operatorId, _parentId);
   }
 }

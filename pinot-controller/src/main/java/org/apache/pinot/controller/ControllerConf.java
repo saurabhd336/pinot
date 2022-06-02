@@ -63,6 +63,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   public static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   public static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  public static final String CONSOLE_SWAGGER_USE_HTTPS = "controller.swagger.use.https";
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
 
@@ -255,7 +256,9 @@ public class ControllerConf extends PinotConfiguration {
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
-  private static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
+
+  public static final String DISABLE_GROOVY = "controller.disable.ingestion.groovy";
+  public static final boolean DEFAULT_DISABLE_GROOVY = true;
 
   public ControllerConf() {
     super(new HashMap<>());
@@ -867,7 +870,7 @@ public class ControllerConf extends PinotConfiguration {
    * @return true if Groovy functions are disabled in controller config, otherwise returns false.
    */
   public boolean isDisableIngestionGroovy() {
-    return getProperty(DISABLE_GROOVY, false);
+    return getProperty(DISABLE_GROOVY, DEFAULT_DISABLE_GROOVY);
   }
 
   private long convertPeriodToUnit(String period, TimeUnit timeUnitToConvertTo) {

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.spi.config.table.ingestion;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -47,17 +45,20 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to handling complex type")
   private ComplexTypeConfig _complexTypeConfig;
 
-  @JsonCreator
-  public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
-      @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
-      @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
-      @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
-      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig) {
+  @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
+  private List<AggregationConfig> _aggregationConfigs;
+
+  @Deprecated
+  public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
+      @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
+      @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
+      @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
+    _aggregationConfigs = aggregationConfigs;
   }
 
   public IngestionConfig() {
@@ -88,6 +89,11 @@ public class IngestionConfig extends BaseJsonConfig {
     return _complexTypeConfig;
   }
 
+  @Nullable
+  public List<AggregationConfig> getAggregationConfigs() {
+    return _aggregationConfigs;
+  }
+
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {
     _batchIngestionConfig = batchIngestionConfig;
   }
@@ -106,5 +112,9 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setComplexTypeConfig(ComplexTypeConfig complexTypeConfig) {
     _complexTypeConfig = complexTypeConfig;
+  }
+
+  public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
+    _aggregationConfigs = aggregationConfigs;
   }
 }
