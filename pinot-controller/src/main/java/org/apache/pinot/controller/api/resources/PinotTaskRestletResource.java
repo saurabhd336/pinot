@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -26,12 +27,15 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -51,11 +55,15 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
+import org.apache.helix.InstanceType;
+import org.apache.helix.messaging.AsyncCallback;
+import org.apache.helix.model.Message;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
-import org.apache.pinot.common.minion.TaskManagerStatusCache;
+import org.apache.pinot.common.messages.HelixTaskGeneratorDebugMessage;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -63,10 +71,13 @@ import org.apache.pinot.controller.api.exception.NoTaskMetadataException;
 import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.quartz.CronTrigger;
@@ -118,10 +129,10 @@ public class PinotTaskRestletResource {
   PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
-  PinotTaskManager _pinotTaskManager;
+  PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
-  TaskManagerStatusCache _taskManagerStatusCache;
+  PinotTaskManager _pinotTaskManager;
 
   @GET
   @Path("/tasks/tasktypes")
@@ -239,18 +250,58 @@ public class PinotTaskRestletResource {
   @GET
   @Path("/tasks/generator/{tableNameWithType}/{taskType}/debug")
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
-  public BaseTaskGeneratorInfo getTaskGenerationDebugInto(
+  public List<JsonNode> getTaskGenerationDebugInto(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
-    BaseTaskGeneratorInfo
-        taskGeneratorMostRecentRunInfo = _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
-    if (taskGeneratorMostRecentRunInfo == null) {
-      throw new ControllerApplicationException(LOGGER, "Task generation information not found",
-          Response.Status.NOT_FOUND);
+          String tableNameWithType)
+      throws InterruptedException {
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setResource(CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+    recipientCriteria.setSelfExcluded(false);
+
+    HelixTaskGeneratorDebugMessage helixTaskGeneratorDebugMessage =
+        new HelixTaskGeneratorDebugMessage(tableNameWithType, taskType);
+    ClusterMessagingService clusterMessagingService =
+        _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
+    CompletableFuture<Boolean> baseTaskGeneratorInfoFuture = new CompletableFuture<>();
+    List<JsonNode> replies = new ArrayList<>();
+    clusterMessagingService.send(recipientCriteria, helixTaskGeneratorDebugMessage, new AsyncCallback() {
+      @Override
+      public void onTimeOut() {
+        baseTaskGeneratorInfoFuture.complete(true);
+      }
+
+      @Override
+      public void onReplyMessage(Message message) {
+        // This is already thread safe due to public synchronized final void onReply(Message message)
+        Map<String, Map<String, String>> mapFields = message.getRecord().getMapFields();
+        if (mapFields.containsKey(Message.Attributes.MESSAGE_RESULT.toString())) {
+          String messageResultJson = mapFields.get(Message.Attributes.MESSAGE_RESULT.toString())
+              .get(HelixTaskGeneratorDebugMessage.TASK_GENERATOR_DEBUG_DATA_KEY);
+          try {
+            JsonNode baseTaskGeneratorInfo = JsonUtils.stringToJsonNode(messageResultJson);
+            replies.add(baseTaskGeneratorInfo);
+          } catch (JsonProcessingException e) {
+            LOGGER.error("Wrong result ", e);
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
+        if (isDone()) {
+          baseTaskGeneratorInfoFuture.complete(true);
+        }
+      }
+    }, -1);
+    // Wait x seconds for messages to be populated
+    try {
+      baseTaskGeneratorInfoFuture.get(5, TimeUnit.SECONDS);
+    } catch (Exception e) {
     }
 
-    return taskGeneratorMostRecentRunInfo;
+    return replies;
   }
 
   @GET
