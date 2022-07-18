@@ -25,7 +25,11 @@ import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
+import org.apache.pinot.common.messages.HelixTaskGeneratorDebugMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
+import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
+import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
+import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.slf4j.Logger;
@@ -38,9 +42,12 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
   private static final String USER_DEFINED_MSG_STRING = Message.MessageType.USER_DEFINE_MSG.toString();
 
   private final PeriodicTaskScheduler _periodicTaskScheduler;
+  private final TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
 
-  public ControllerUserDefinedMessageHandlerFactory(PeriodicTaskScheduler periodicTaskScheduler) {
+  public ControllerUserDefinedMessageHandlerFactory(PeriodicTaskScheduler periodicTaskScheduler,
+      TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> taskManagerStatusCache) {
     _periodicTaskScheduler = periodicTaskScheduler;
+    _taskManagerStatusCache = taskManagerStatusCache;
   }
 
   @Override
@@ -49,6 +56,10 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
     if (messageType.equals(RunPeriodicTaskMessage.RUN_PERIODIC_TASK_MSG_SUB_TYPE)) {
       return new RunPeriodicTaskMessageHandler(new RunPeriodicTaskMessage(message), notificationContext,
           _periodicTaskScheduler);
+    }
+    if (messageType.equals(HelixTaskGeneratorDebugMessage.GET_GENERATOR_DEBUG_LOGS_SUBTYPE)) {
+      return new GeneratorDebugLogsHandler(new HelixTaskGeneratorDebugMessage(message), notificationContext,
+          _taskManagerStatusCache);
     }
 
     // Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
@@ -65,6 +76,45 @@ public class ControllerUserDefinedMessageHandlerFactory implements MessageHandle
 
   @Override
   public void reset() {
+  }
+
+  private static class GeneratorDebugLogsHandler extends MessageHandler {
+    private TaskManagerStatusCache _taskManagerStatusCache;
+    private String _tableNameWithType;
+    private String _taskType;
+
+    /**
+     * The constructor. The message and notification context must be provided via
+     * creation.
+     * @param message
+     * @param context
+     */
+    public GeneratorDebugLogsHandler(HelixTaskGeneratorDebugMessage message, NotificationContext context,
+        TaskManagerStatusCache taskManagerStatusCache) {
+      super(message, context);
+      _taskManagerStatusCache = taskManagerStatusCache;
+      _tableNameWithType = message.getTableNameWithType();
+      _taskType = message.getTaskType();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      BaseTaskGeneratorInfo baseTaskGeneratorInfo =
+          _taskManagerStatusCache.fetchTaskGeneratorInfo(_tableNameWithType, _taskType);
+      if (baseTaskGeneratorInfo != null) {
+        helixTaskResult.getTaskResultMap()
+            .put(HelixTaskGeneratorDebugMessage.TASK_GENERATOR_DEBUG_DATA_KEY, baseTaskGeneratorInfo.toJsonString());
+      }
+      helixTaskResult.setSuccess(true);
+      return helixTaskResult;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Error ", e);
+    }
   }
 
   /** Message handler for {@link RunPeriodicTaskMessage} message. */
