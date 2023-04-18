@@ -89,6 +89,24 @@ public class PinotSegmentColumnReader implements Closeable {
     return _forwardIndexReader.getDictId(docId, _forwardIndexReaderContext);
   }
 
+  public Object getValue(int docId, boolean annonymize) {
+    Object val = getValue(docId);
+    if (!annonymize) {
+      return val;
+    }
+
+    if (_forwardIndexReader.isSingleValue()) {
+      return DataAnonymizer.anonymize(val, _forwardIndexReader.getStoredType());
+    } else {
+      Object[] vals = (Object[]) val;
+      for (int i = 0; i < vals.length; i++) {
+        vals[i] = DataAnonymizer.anonymize(vals[i], _forwardIndexReader.getStoredType());
+      }
+
+      return vals;
+    }
+  }
+
   public Object getValue(int docId) {
     if (_dictionary != null) {
       // Dictionary based
