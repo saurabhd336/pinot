@@ -30,20 +30,20 @@ public class DataAnonymizer {
     Random rand;
     switch (dataType) {
       case INT:
-        rand = new Random((long) originalValue);
-        return rand.nextInt();
+        rand = new Random((int) originalValue);
+        return Math.abs(rand.nextInt());
       case LONG:
         rand = new Random((long) originalValue);
-        return rand.nextLong();
+        return Math.abs(rand.nextLong());
       case FLOAT:
-        rand = new Random((long) originalValue);
-        return rand.nextFloat();
+        rand = new Random((long)((float) originalValue));
+        return Math.abs(rand.nextFloat());
       case DOUBLE:
-        rand = new Random((long) originalValue);
-        return rand.nextDouble();
+        rand = new Random((long)((double) originalValue));
+        return Math.abs(rand.nextDouble());
       case BIG_DECIMAL:
         rand = new Random(((BigDecimal) originalValue).longValue());
-        return BigDecimal.valueOf(rand.nextDouble());
+        return BigDecimal.valueOf(Math.abs(rand.nextDouble()));
       case STRING:
         String data = (String) originalValue;
         StringBuilder sb = new StringBuilder();

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.readers;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +52,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private Map<String, PinotSegmentColumnReader> _columnReaderMap;
   private int[] _sortedDocIds;
   private boolean _skipDefaultNullValues;
-  private boolean _anonymizeValues;
+  private List<String> _columnsToAnonymize;
 
   private int _nextDocId = 0;
 
@@ -118,18 +119,18 @@ public class PinotSegmentRecordReader implements RecordReader {
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
-    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, false);
+    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, Collections.emptyList());
   }
 
   public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable List<String> sortOrder,
-      boolean skipDefaultNullValues, boolean anonymizeValues) {
+      boolean skipDefaultNullValues, List<String> columnsToAnonymize) {
     IndexSegment indexSegment;
     try {
       indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while loading the segment from: " + indexDir, e);
     }
-    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, anonymizeValues);
+    init(indexSegment, true, fieldsToRead, null, sortOrder, skipDefaultNullValues, columnsToAnonymize);
   }
 
   /**
@@ -138,7 +139,7 @@ public class PinotSegmentRecordReader implements RecordReader {
    * @param indexSegment Index segment to read from
    */
   public void init(IndexSegment indexSegment) {
-    init(indexSegment, false, null, null, null, false, false);
+    init(indexSegment, false, null, null, null, false, Collections.emptyList());
   }
 
   /**
@@ -148,7 +149,7 @@ public class PinotSegmentRecordReader implements RecordReader {
    * @param sortedDocIds Array of sorted document ids
    */
   public void init(MutableSegment mutableSegment, @Nullable int[] sortedDocIds) {
-    init(mutableSegment, false, null, sortedDocIds, null, false, false);
+    init(mutableSegment, false, null, sortedDocIds, null, false, Collections.emptyList());
   }
 
   /**
@@ -162,7 +163,7 @@ public class PinotSegmentRecordReader implements RecordReader {
    * @param skipDefaultNullValues Whether to skip putting default null values into the record
    */
   private void init(IndexSegment indexSegment, boolean destroySegmentOnClose, @Nullable Set<String> fieldsToRead,
-      @Nullable int[] sortedDocIds, @Nullable List<String> sortOrder, boolean skipDefaultNullValues, boolean anonymizeValues) {
+      @Nullable int[] sortedDocIds, @Nullable List<String> sortOrder, boolean skipDefaultNullValues, List<String> columnsToAnonymize) {
     _indexSegment = indexSegment;
     _destroySegmentOnClose = destroySegmentOnClose;
     _numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
@@ -195,7 +196,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       }
 
       _skipDefaultNullValues = skipDefaultNullValues;
-      _anonymizeValues = anonymizeValues;
+      _columnsToAnonymize = columnsToAnonymize;
     }
   }
 
@@ -233,7 +234,7 @@ public class PinotSegmentRecordReader implements RecordReader {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
       if (!columnReader.isNull(docId)) {
-        buffer.putValue(column, columnReader.getValue(docId, _anonymizeValues));
+        buffer.putValue(column, columnReader.getValue(docId, _columnsToAnonymize.contains(column)));
       } else if (!_skipDefaultNullValues) {
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
