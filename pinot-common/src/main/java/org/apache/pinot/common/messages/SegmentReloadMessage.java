@@ -36,6 +36,7 @@ public class SegmentReloadMessage extends Message {
 
   private static final String FORCE_DOWNLOAD_KEY = "forceDownload";
   private static final String SEGMENT_NAMES = "segmentNames";
+  private static final String ORIGINAL_MESSAGE_ID = "originalMessageId";
 
   /**
    * This msg asks server to reload all segments in the given a table.
@@ -63,6 +64,8 @@ public class SegmentReloadMessage extends Message {
 
     ZNRecord znRecord = getRecord();
     znRecord.setBooleanField(FORCE_DOWNLOAD_KEY, forceDownload);
+    znRecord.setSimpleField(ORIGINAL_MESSAGE_ID, getMsgId());
+
     if (CollectionUtils.isNotEmpty(segmentNames)) {
       // TODO: use the new List field and deprecate the partition name in next release.
       setPartitionName(segmentNames.get(0));
@@ -84,5 +87,9 @@ public class SegmentReloadMessage extends Message {
   @Nullable
   public List<String> getSegmentList() {
     return getRecord().getListField(SEGMENT_NAMES);
+  }
+
+  public String getOriginalMessageId() {
+    return getRecord().getSimpleField(ORIGINAL_MESSAGE_ID);
   }
 }

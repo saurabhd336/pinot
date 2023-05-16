@@ -68,6 +68,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.response.SegmentReloadStatusValue;
 import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -676,8 +677,9 @@ public class PinotSegmentRestletResource {
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
       String reloadTaskStatusEndpoint =
-          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
-              + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
+          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType
+              + "?reloadJobTimestamp=" + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)
+              + "&reloadJobId=" + controllerJobZKMetadata.get(CommonConstants.ControllerJob.JOB_ID);
       if (singleSegmentName != null) {
         reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + singleSegmentName;
       }
@@ -702,10 +704,9 @@ public class PinotSegmentRestletResource {
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       String responseString = streamResponse.getValue();
       try {
-        ServerReloadControllerJobStatusResponse response =
-            JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
-        serverReloadControllerJobStatusResponse.setSuccessCount(
-            serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
+        SegmentReloadStatusValue response =
+            JsonUtils.stringToObject(responseString, SegmentReloadStatusValue.class);
+        serverReloadControllerJobStatusResponse.add(response);
       } catch (Exception e) {
         serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
             serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1

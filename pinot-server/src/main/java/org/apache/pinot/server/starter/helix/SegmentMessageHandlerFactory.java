@@ -116,9 +116,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     private final boolean _forceDownload;
     private final List<String> _segmentList;
 
+    private final String _originalMessageId;
+
     SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, ServerMetrics metrics,
         NotificationContext context) {
       super(segmentReloadMessage, metrics, context);
+      _originalMessageId = segmentReloadMessage.getOriginalMessageId();
       _forceDownload = segmentReloadMessage.shouldForceDownload();
       _segmentList = segmentReloadMessage.getSegmentList();
     }
@@ -128,6 +131,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         throws InterruptedException {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
+      SegmentMessageHandlerStatusManager.init(_originalMessageId);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
           _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload,
@@ -148,10 +152,12 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _segmentRefreshSemaphore);
         }
         helixTaskResult.setSuccess(true);
+        SegmentMessageHandlerStatusManager.markSuccess(_originalMessageId);
       } catch (Throwable e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.RELOAD_FAILURES, 1);
         // catch all Errors and Exceptions: if we only catch Exception, Errors go completely unhandled
         // (without any corresponding logs to indicate failure!) in the callable path
+        SegmentMessageHandlerStatusManager.markFailed(_originalMessageId, e);
         throw new RuntimeException(
             "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
       }

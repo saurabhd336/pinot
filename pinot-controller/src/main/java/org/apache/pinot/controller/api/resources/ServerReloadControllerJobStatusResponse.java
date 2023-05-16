@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.restlet.resources.response.SegmentReloadStatusValue;
+
 
 public class ServerReloadControllerJobStatusResponse {
   private double _timeElapsedInMinutes;
@@ -28,6 +32,9 @@ public class ServerReloadControllerJobStatusResponse {
   private int _totalServersQueried;
   private int _totalServerCallsFailed;
   private Map<String, String> _metadata;
+  private List<String> _exceptions = new ArrayList<>();
+
+  private final List<String> _serversProcessingMessage = new ArrayList<>();
 
   public int getTotalSegmentCount() {
     return _totalSegmentCount;
@@ -83,5 +90,24 @@ public class ServerReloadControllerJobStatusResponse {
 
   public void setMetadata(Map<String, String> metadata) {
     _metadata = metadata;
+  }
+
+  public List<String> getServersProcessingMessage() {
+    return _serversProcessingMessage;
+  }
+
+  public List<String> getExceptions() {
+    return _exceptions;
+  }
+
+  public void add(SegmentReloadStatusValue segmentReloadStatusValue) {
+    _successCount += segmentReloadStatusValue.getSuccessCount();
+    if (segmentReloadStatusValue.isProcessing()) {
+      _serversProcessingMessage.add(segmentReloadStatusValue.getInstanceName());
+    }
+
+    if (segmentReloadStatusValue.getException() != null) {
+      _exceptions.add(segmentReloadStatusValue.getException());
+    }
   }
 }

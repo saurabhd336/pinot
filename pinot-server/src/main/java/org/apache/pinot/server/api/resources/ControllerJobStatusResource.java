@@ -22,16 +22,19 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import java.util.List;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.common.restlet.resources.response.SegmentReloadStatusValue;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
+import org.apache.pinot.server.starter.helix.SegmentMessageHandlerStatusManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -42,29 +45,43 @@ public class ControllerJobStatusResource {
   @Inject
   private ServerInstance _serverInstance;
 
+  @Inject
+  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
+  private String _instanceId;
+
   @GET
   @Path("/controllerJob/reloadStatus/{tableNameWithType}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
   public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
-      @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
+      @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp, @QueryParam("reloadJobId") String messageId,
       @QueryParam("segmentName") String segmentName)
       throws Exception {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentMessageHandlerStatusManager.HandlerStatus handlerStatus =
+        SegmentMessageHandlerStatusManager.getStatus(messageId);
+    String exception = null;
+    boolean isProcessing = false;
+
+    if (handlerStatus != null) {
+      exception = handlerStatus.getException();
+      isProcessing =
+          handlerStatus.getStatus() == SegmentMessageHandlerStatusManager.SegmentMessageHandlerStatus.IN_PROGRESS;
+    }
 
     if (segmentName == null) {
       // All segments
       List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
       try {
-        long successCount = 0;
+        int successCount = 0;
         for (SegmentDataManager segmentDataManager : allSegments) {
           if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
             successCount++;
           }
         }
         SegmentReloadStatusValue segmentReloadStatusValue =
-            new SegmentReloadStatusValue(allSegments.size(), successCount);
+            new SegmentReloadStatusValue(allSegments.size(), successCount, _instanceId, isProcessing, exception);
         return JsonUtils.objectToString(segmentReloadStatusValue);
       } finally {
         for (SegmentDataManager segmentDataManager : allSegments) {
@@ -74,7 +91,7 @@ public class ControllerJobStatusResource {
     } else {
       SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
       if (segmentDataManager == null) {
-        return JsonUtils.objectToString(new SegmentReloadStatusValue(0, 0));
+        return JsonUtils.objectToString(new SegmentReloadStatusValue(0, 0, _instanceId, isProcessing, exception));
       }
       try {
         int successCount = 0;
@@ -82,7 +99,7 @@ public class ControllerJobStatusResource {
           successCount = 1;
         }
         SegmentReloadStatusValue segmentReloadStatusValue =
-            new SegmentReloadStatusValue(1, successCount);
+            new SegmentReloadStatusValue(1, successCount, _instanceId, isProcessing, exception);
         return JsonUtils.objectToString(segmentReloadStatusValue);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
