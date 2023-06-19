@@ -57,6 +57,24 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
     }
   }
 
+  public void prefetchSv(int docId, ChunkReaderContext context) {
+    if (_isCompressed) {
+      int chunkId = docId / _numDocsPerChunk;
+      prefetchChunk(chunkId);
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      int chunkRowId = docId % _numDocsPerChunk;
+
+      // These offsets are offset in the data buffer
+      long chunkStartOffset = getChunkPosition(chunkId);
+      long valueStartOffset = chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + chunkRowId * ROW_OFFSET_SIZE);
+      long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
+
+      int length = (int) (valueEndOffset - valueStartOffset);
+      _dataBuffer.prefetch(valueStartOffset, length);
+    }
+  }
+
   @Override
   public BigDecimal getBigDecimal(int docId, ChunkReaderContext context) {
     return BigDecimalUtils.deserialize(getBytes(docId, context));

@@ -51,6 +51,31 @@ public final class FixedBytePower2ChunkSVForwardIndexReader extends BaseChunkFor
   }
 
   @Override
+  public void prefetchSv(int docId, ChunkReaderContext context) {
+    if (_isCompressed) {
+      int chunkId = docId >>> _shift;
+      prefetchChunk(chunkId);
+    } else {
+      switch (getStoredType()) {
+        case INT:
+          _rawData.prefetch((long) docId * Integer.BYTES, Integer.BYTES);
+          break;
+        case LONG:
+          _rawData.prefetch((long) docId * Long.BYTES, Long.BYTES);
+          break;
+        case FLOAT:
+          _rawData.prefetch((long) docId * Float.BYTES, Float.BYTES);
+          break;
+        case DOUBLE:
+          _rawData.prefetch((long) docId * Double.BYTES, Double.BYTES);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Override
   public int getInt(int docId, ChunkReaderContext context) {
     if (_isCompressed) {
       int chunkRowId = docId & (_numDocsPerChunk - 1);

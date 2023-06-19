@@ -51,6 +51,23 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     }
   }
 
+  public void prefetchMv(int docId, ChunkReaderContext context) {
+    if (_isCompressed) {
+      int chunkId = docId / _numDocsPerChunk;
+      prefetchChunk(chunkId);
+    } else {
+      int chunkId = docId / _numDocsPerChunk;
+      int chunkRowId = docId % _numDocsPerChunk;
+
+      // These offsets are offset in the data buffer
+      long chunkStartOffset = getChunkPosition(chunkId);
+      long valueStartOffset =
+          chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * ROW_OFFSET_SIZE);
+      long valueEndOffset = getValueEndOffset(chunkId, chunkRowId, chunkStartOffset);
+      _dataBuffer.prefetch(valueStartOffset, (int) (valueEndOffset - valueStartOffset));
+    }
+  }
+
   @Override
   public int getIntMV(int docId, int[] valueBuffer, ChunkReaderContext context) {
     ByteBuffer byteBuffer = slice(docId, context);

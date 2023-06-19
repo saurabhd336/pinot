@@ -148,6 +148,21 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     return decompressedBuffer;
   }
 
+  protected void prefetchChunk(int chunkId) {
+    int chunkSize;
+    long chunkPosition = getChunkPosition(chunkId);
+
+    // Size of chunk can be determined using next chunks offset, or end of data buffer for last chunk.
+    if (chunkId == (_numChunks - 1)) { // Last chunk.
+      chunkSize = (int) (_dataBuffer.size() - chunkPosition);
+    } else {
+      long nextChunkOffset = getChunkPosition(chunkId + 1);
+      chunkSize = (int) (nextChunkOffset - chunkPosition);
+    }
+
+    _dataBuffer.prefetch(chunkPosition, chunkSize);
+  }
+
   /**
    * Helper method to get the offset of the chunk in the data.
    * @param chunkId Id of the chunk for which to return the position.
@@ -184,6 +199,45 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   @Override
   public int getLengthOfLongestEntry() {
     return _lengthOfLongestEntry;
+  }
+
+  public boolean isPrefetchSupported() {
+    return _dataBuffer.isPrefetchSupported();
+  }
+  @Override
+  public void prefetch(int[] docIds, int length, ChunkReaderContext context) {
+    if (!isPrefetchSupported()) {
+      return;
+    }
+    // Do nothing
+    if (isSingleValue() && _storedType.isFixedWidth() && !_isCompressed && isContiguousRange(docIds, docIds.length)) {
+      switch (_storedType) {
+        case INT: {
+          int minOffset = docIds[0] * Integer.BYTES;
+          _rawData.prefetch(minOffset, length * Integer.BYTES);
+        }
+        break;
+        case LONG: {
+          int minOffset = docIds[0] * Long.BYTES;
+          _rawData.prefetch(minOffset, length * Long.BYTES);
+        }
+        break;
+        case FLOAT: {
+          int minOffset = docIds[0] * Float.BYTES;
+          _rawData.prefetch(minOffset, length * Float.BYTES);
+        }
+        break;
+        case DOUBLE: {
+          int minOffset = docIds[0] * Double.BYTES;
+          _rawData.prefetch(minOffset, length * Double.BYTES);
+        }
+        break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    } else {
+      ForwardIndexReader.super.prefetch(docIds, length, context);
+    }
   }
 
   @Override

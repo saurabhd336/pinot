@@ -44,6 +44,32 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
    */
   boolean isSingleValue();
 
+  default boolean isPrefetchSupported() {
+    return false;
+  }
+
+  default void prefetch(int[] docIds, int length, T context) {
+    if (!isPrefetchSupported()) {
+      return;
+    }
+
+    if (isSingleValue()) {
+      for (int i = 0; i < length; i++) {
+        prefetchSv(docIds[i], context);
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        prefetchMv(docIds[i], context);
+      }
+    }
+  }
+
+  default void prefetchSv(int docId, T context) {
+  }
+
+  default void prefetchMv(int docId, T context) {
+  }
+
   /**
    * Returns the data type of the values in the forward index. Returns {@link DataType#INT} for dictionary-encoded
    * forward index.

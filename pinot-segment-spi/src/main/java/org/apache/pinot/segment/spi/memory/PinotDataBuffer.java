@@ -615,6 +615,13 @@ public abstract class PinotDataBuffer implements Closeable {
     return toDirectByteBuffer(offset, size, order());
   }
 
+  public boolean isPrefetchSupported() {
+    return false;
+  }
+
+  public void prefetch(long offset, int size) {
+  }
+
   public abstract void flush();
 
   public abstract void release()
