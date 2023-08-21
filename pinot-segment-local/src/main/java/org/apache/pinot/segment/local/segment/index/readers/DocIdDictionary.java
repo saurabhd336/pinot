@@ -56,6 +56,11 @@ public class DocIdDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public int indexOf(int value) {
+    return insertionIndexOf(Integer.toString(value));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return dictId;
   }
