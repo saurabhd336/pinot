@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests.tpch;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,11 +25,8 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -41,7 +37,7 @@ import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.TPCHQueryIntegrationTest;
 import org.apache.pinot.integration.tests.tpch.generator.PinotQueryBasedColumnDataProvider;
 import org.apache.pinot.integration.tests.tpch.generator.SampleColumnDataProvider;
-import org.apache.pinot.integration.tests.tpch.generator.TPCHQueryGenerator;
+import org.apache.pinot.integration.tests.tpch.generator.TPCHQueryGeneratorV2;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.utils.JarUtils;
@@ -55,8 +51,8 @@ import org.testng.annotations.Test;
 
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
-  private static final int NUM_TPCH_QUERIES = 24;
-  private TPCHQueryGenerator _tpchQueryGenerator;
+  private static final int NUM_TPCH_QUERIES = 1000;
+  private static TPCHQueryGeneratorV2 _tpchQueryGenerator;
 
   static {
     TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
@@ -119,16 +115,25 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
             return getPinotConnection();
           }
         });
-    _tpchQueryGenerator = new TPCHQueryGenerator(sampleColumnDataProvider);
+    _tpchQueryGenerator = new TPCHQueryGeneratorV2(sampleColumnDataProvider);
     _tpchQueryGenerator.init();
   }
 
-  @Test
-  public void testTPCHQueries() {
+  @DataProvider(name = "QueryDataProvider")
+  public static Object[][] queryDataProvider()
+      throws IOException {
+    Object[][] queries = new Object[NUM_TPCH_QUERIES][];
     for (int i = 0; i < NUM_TPCH_QUERIES; i++) {
-      String query = _tpchQueryGenerator.generateRandomQuery();
-      testQueriesSucceed(query);
+      queries[i] = new Object[1];
+      queries[i][0] = _tpchQueryGenerator.generateRandomQuery();
     }
+
+    return queries;
+  }
+
+  @Test(dataProvider = "QueryDataProvider")
+  public void testTPCHQueries(String query) {
+    testQueriesSucceed(query);
   }
 
   protected void testQueriesSucceed(String query) {
