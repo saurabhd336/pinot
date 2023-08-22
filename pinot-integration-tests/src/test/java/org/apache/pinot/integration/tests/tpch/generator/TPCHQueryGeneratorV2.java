@@ -130,12 +130,23 @@ public class TPCHQueryGeneratorV2 {
   private String generateInnerQueryForPredicate(Table t1, Column c) {
     QuerySkeleton innerQuery = new QuerySkeleton();
     Random random = new Random();
+    List<String> predicates = new ArrayList<>();
 
     innerQuery.addTable(t1.getTableName());
+    // Limit to maximum of 1 join
+    if (random.nextBoolean()) {
+      RelatedTable relatedTable = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
+      if (relatedTable != null) {
+        innerQuery.addTable(relatedTable.getForeignTableName());
+        predicates.add("\"" + t1.getTableName() + "\".\"" + relatedTable.getLocalTableKey() + "\"=\""
+            + relatedTable.getForeignTableName() + "\".\"" + relatedTable.getForeignTableKey() + "\"");
+        predicates.addAll(getRandomPredicates(tables.get(relatedTable.getForeignTableName()), false));
+      }
+    }
     String aggregation = c.getColumnType().aggregations.get(random.nextInt(c.getColumnType().aggregations.size()));
     innerQuery.addProjection(aggregation + "(\"" + t1.getTableName() + "\".\"" + c.getColumnName() + "\")");
 
-    List<String> predicates = getRandomPredicates(t1, false);
+    predicates.addAll(getRandomPredicates(t1, false));
     predicates.forEach(innerQuery::addPredicate);
     return innerQuery.toString();
   }
