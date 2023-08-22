@@ -127,7 +127,34 @@ public class TPCHQueryGeneratorV2 {
     return results;
   }
 
-  private List<String> getRandomPredicates(Table t1) {
+  private String generateInnerQueryForPredicate(Table t1, Column c) {
+    QuerySkeleton innerQuery = new QuerySkeleton();
+    Random random = new Random();
+
+    innerQuery.addTable(t1.getTableName());
+    String aggregation = c.getColumnType().aggregations.get(random.nextInt(c.getColumnType().aggregations.size()));
+    innerQuery.addProjection(aggregation + "(\"" + t1.getTableName() + "\".\"" + c.getColumnName() + "\")");
+
+    List<String> predicates = getRandomPredicates(t1, false);
+    predicates.forEach(innerQuery::addPredicate);
+    return innerQuery.toString();
+  }
+
+  private String getRandomValueForPredicate(Table t1, Column c, boolean useNextedQueries) {
+    Random random = new Random();
+    if (random.nextBoolean() && useNextedQueries && c.getColumnType().aggregations.size() > 0) {
+      // Use nested query for predicate
+      return "(" + generateInnerQueryForPredicate(t1, c) + ")";
+    } else {
+      if (c.getColumnType() == ColumnType.STRING) {
+        return "'" + c.getRandomStringValue() + "'";
+      } else {
+        return String.valueOf(c.getRandomNumericValue());
+      }
+    }
+  }
+
+  private List<String> getRandomPredicates(Table t1, boolean useNestedQueries) {
     Random random = new Random();
     int predicateCount = random.nextInt(5) + 1;
     List<String> predicates = new ArrayList<>();
@@ -138,18 +165,17 @@ public class TPCHQueryGeneratorV2 {
       String name = column.getColumnName();
       ColumnType columnType = column.getColumnType();
       String operator = columnType.operators.get(random.nextInt(columnType.operators.size()));
-      StringBuilder predicateBuilder = new StringBuilder();
-      predicateBuilder.append(" \"").append(t1.getTableName()).append("\".\"").append(name).append("\" ");
-      predicateBuilder.append(operator);
-      if (columnType == ColumnType.STRING) {
-        predicateBuilder.append(" '").append(column.getRandomStringValue()).append("' ");
-      } else {
-        predicateBuilder.append(" ").append(column.getRandomNumericValue()).append(" ");
-      }
-      results.add(predicateBuilder.toString());
+      String predicateBuilder =
+          " \"" + t1.getTableName() + "\".\"" + name + "\" " + operator + " " + getRandomValueForPredicate(t1, column,
+              useNestedQueries) + " ";
+      results.add(predicateBuilder);
     }
 
     return results;
+  }
+
+  private List<String> getRandomPredicates(Table t1) {
+    return getRandomPredicates(t1, true);
   }
 
   private List<String> getRandomOrderBys(Table t1) {
@@ -259,9 +285,10 @@ public class TPCHQueryGeneratorV2 {
       Column column = t1.getColumns().get(random.nextInt(t1.getColumns().size()));
       String columnName = column.getColumnName();
       if (!selectedColumns.contains(columnName)) {
-        if (random.nextInt() % 2 == 0 && column.getColumnType().aggregations.size() > 0) {
+        if (random.nextBoolean() && column.getColumnType().aggregations.size() > 0) {
           // Use as aggregation
-          String aggregation = column.getColumnType().aggregations.get(random.nextInt(column.getColumnType().aggregations.size()));
+          String aggregation =
+              column.getColumnType().aggregations.get(random.nextInt(column.getColumnType().aggregations.size()));
           resultProjections.add(aggregation + "(\"" + t1.getTableName() + "\".\"" + columnName + "\")");
         } else {
           // Use as group by
