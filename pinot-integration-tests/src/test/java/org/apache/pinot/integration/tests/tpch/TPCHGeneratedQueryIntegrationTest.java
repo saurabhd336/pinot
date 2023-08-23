@@ -18,15 +18,17 @@
  */
 package org.apache.pinot.integration.tests.tpch;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -34,7 +36,6 @@ import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
-import org.apache.pinot.integration.tests.TPCHQueryIntegrationTest;
 import org.apache.pinot.integration.tests.tpch.generator.PinotQueryBasedColumnDataProvider;
 import org.apache.pinot.integration.tests.tpch.generator.SampleColumnDataProvider;
 import org.apache.pinot.integration.tests.tpch.generator.TPCHQueryGeneratorV2;
@@ -48,23 +49,22 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+// TODO: extract common functions from TPCHQueryIntegrationTest and SSBQueryIntegrationTest
 
+/**
+ * Integration test that tests Pinot using TPCH data.
+ * Data is loaded into Pinot and H2 from /resources/examples/batch/tpch. The dataset size is very small, please follow
+ * REAME.md to generate a larger dataset for better testing.
+ * Queries are executed against Pinot and H2, and the results are compared.
+ */
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Map<String, String> TPCH_QUICKSTART_TABLE_RESOURCES;
-  private static final int NUM_TPCH_QUERIES = 1000;
+  private static final int NUM_TPCH_QUERIES = 24;
   private static TPCHQueryGeneratorV2 _tpchQueryGenerator;
 
-  static {
-    TPCH_QUICKSTART_TABLE_RESOURCES = new HashMap<>();
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("orders", "examples/batch/tpch/orders");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("lineitem", "examples/batch/tpch/lineitem");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("region", "examples/batch/tpch/region");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("partsupp", "examples/batch/tpch/partsupp");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("customer", "examples/batch/tpch/customer");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("nation", "examples/batch/tpch/nation");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("part", "examples/batch/tpch/part");
-    TPCH_QUICKSTART_TABLE_RESOURCES.put("supplier", "examples/batch/tpch/supplier");
-  }
+  // Pinot query 6 fails due to mismatch results.
+  // Pinot queries 15, 16, 17 fail due to lack of support for views.
+  // Pinot queries 23, 24 fail due to java heap space problem or timeout.
+  private static final Set<Integer> EXEMPT_QUERIES = ImmutableSet.of(6, 15, 16, 17, 23, 24);
 
   @BeforeClass
   public void setUp()
@@ -77,12 +77,13 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     startBroker();
     startServer();
 
-    for (Map.Entry<String, String> tableResource : TPCH_QUICKSTART_TABLE_RESOURCES.entrySet()) {
-      File tableSegmentDir = new File(_segmentDir, tableResource.getKey());
-      File tarDir = new File(_tarDir, tableResource.getKey());
-      String tableName = tableResource.getKey();
-      URL resourceUrl = getClass().getClassLoader().getResource(tableResource.getValue());
-      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResource.getValue());
+    setUpH2Connection();
+    for (String tableName : Constants.TPCH_TABLE_NAMES) {
+      File tableSegmentDir = new File(_segmentDir, tableName);
+      File tarDir = new File(_tarDir, tableName);
+      String tableResourceFolder = Constants.getTableResourceFolder(tableName);
+      URL resourceUrl = getClass().getClassLoader().getResource(tableResourceFolder);
+      Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResourceFolder);
       File resourceFile;
       if ("jar".equals(resourceUrl.getProtocol())) {
         String[] splits = resourceUrl.getFile().split("!");
@@ -93,7 +94,8 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
       } else {
         resourceFile = new File(resourceUrl.getFile());
       }
-      File dataFile = new File(resourceFile.getAbsolutePath(), "rawdata" + File.separator + tableName + ".avro");
+      File dataFile =
+          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName)).getFile());
       Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
       File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
@@ -106,6 +108,8 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(dataFile), tableConfig, schema, 0,
           tableSegmentDir, tarDir);
       uploadSegments(tableName, tarDir);
+      // H2
+      ClusterIntegrationTestUtils.setUpH2TableWithAvro(Collections.singletonList(dataFile), tableName, _h2Connection);
     }
 
     SampleColumnDataProvider sampleColumnDataProvider =
@@ -119,39 +123,55 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     _tpchQueryGenerator.init();
   }
 
-  @DataProvider(name = "QueryDataProvider")
-  public static Object[][] queryDataProvider()
-      throws IOException {
-    Object[][] queries = new Object[NUM_TPCH_QUERIES][];
-    for (int i = 0; i < NUM_TPCH_QUERIES; i++) {
-      queries[i] = new Object[1];
-      queries[i][0] = _tpchQueryGenerator.generateRandomQuery();
-    }
-
-    return queries;
-  }
-
   @Test(dataProvider = "QueryDataProvider")
-  public void testTPCHQueries(String query) {
-    testQueriesSucceed(query);
+  public void testTPCHQueries(String[] pinotAndH2Queries)
+      throws Exception {
+    testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
   }
 
-  protected void testQueriesSucceed(String query) {
-    System.out.printf("Running query : %s\n\n", query);
-
-    ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(query);
+  protected void testQueriesSucceed(String pinotQuery, String h2Query)
+      throws Exception {
+    ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(pinotQuery);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
     if (CollectionUtils.isNotEmpty(pinotResultSetGroup.getExceptions())) {
       Assert.fail(
           String.format("TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0),
-              query));
+              pinotQuery));
     }
-    // TODO: Enable the following 2 assertions after fixing the data so each query returns non-zero rows
-    /*
-    Assert.assertTrue(resultTableResultSet.getRowCount() > 0,
-        String.format("Expected non-zero rows for tpc-h query: %s", query));
-    Assert.assertTrue(resultTableResultSet.getColumnCount() > 0,
-        String.format("Expected non-zero columns for tpc-h query: %s", query)); */
+
+    int numRows = resultTableResultSet.getRowCount();
+    int numColumns = resultTableResultSet.getColumnCount();
+
+    // h2 response
+    Assert.assertNotNull(_h2Connection);
+    Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    h2statement.execute(h2Query);
+    ResultSet h2ResultSet = h2statement.getResultSet();
+    System.out.println(h2ResultSet);
+
+    // compare results.
+    Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
+    if (h2ResultSet.first()) {
+      for (int i = 0; i < numRows; i++) {
+        for (int c = 0; c < numColumns; c++) {
+          String h2Value = h2ResultSet.getString(c + 1);
+          String pinotValue = resultTableResultSet.getString(i, c);
+          boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
+          if (error) {
+            Assert.fail(String.format(
+                "Query %s\nValue: %d does not match at (%d, %d), expected h2 value: %s actual Pinot value: %s",
+                pinotQuery, c, i, c, h2Value, pinotValue));
+          }
+        }
+        if (!h2ResultSet.next() && i != numRows - 1) {
+          Assert.fail(
+              String.format("Query %s\nH2 result set is smaller than Pinot result set after: %d rows", pinotQuery, i));
+        }
+      }
+    }
+    Assert.assertFalse(h2ResultSet.next(),
+        String.format("Query %s \nPinot result set is smaller than H2 result set after: %d rows!", pinotQuery,
+            numRows));
   }
 
   @Override
@@ -173,7 +193,7 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
   public void tearDown()
       throws Exception {
     // unload all TPCH tables.
-    for (String table : TPCH_QUICKSTART_TABLE_RESOURCES.keySet()) {
+    for (String table : Constants.TPCH_TABLE_NAMES) {
       dropOfflineTable(table);
     }
 
@@ -185,5 +205,17 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
 
     FileUtils.deleteDirectory(_tempDir);
   }
-}
 
+  @DataProvider(name = "QueryDataProvider")
+  public static Object[][] queryDataProvider()
+      throws IOException {
+    Object[][] queries = new Object[NUM_TPCH_QUERIES][];
+    for (int i = 0; i < NUM_TPCH_QUERIES; i++) {
+      queries[i] = new Object[2];
+      queries[i][0] = _tpchQueryGenerator.generateRandomQuery();
+      queries[i][1] = queries[i][0];
+    }
+
+    return queries;
+  }
+}

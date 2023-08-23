@@ -114,17 +114,15 @@ public class TPCHQueryGeneratorV2 {
     Random random = new Random();
     int numColumns = random.nextInt(t1.getColumns().size()) + 1;
     List<String> selectedColumns = new ArrayList<>();
-    List<String> results = new ArrayList<>();
 
     while (selectedColumns.size() < numColumns) {
       String columnName = t1.getColumns().get(random.nextInt(t1.getColumns().size())).getColumnName();
       if (!selectedColumns.contains(columnName)) {
         selectedColumns.add(columnName);
-        results.add("\"" + t1.getTableName() + "\".\"" + columnName + "\"");
       }
     }
 
-    return results;
+    return selectedColumns;
   }
 
   private String generateInnerQueryForPredicate(Table t1, Column c) {
@@ -138,13 +136,12 @@ public class TPCHQueryGeneratorV2 {
       RelatedTable relatedTable = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
       if (relatedTable != null) {
         innerQuery.addTable(relatedTable.getForeignTableName());
-        predicates.add("\"" + t1.getTableName() + "\".\"" + relatedTable.getLocalTableKey() + "\"=\""
-            + relatedTable.getForeignTableName() + "\".\"" + relatedTable.getForeignTableKey() + "\"");
+        predicates.add(relatedTable.getLocalTableKey() + "=" + relatedTable.getForeignTableKey());
         predicates.addAll(getRandomPredicates(tables.get(relatedTable.getForeignTableName()), false));
       }
     }
     String aggregation = c.getColumnType().aggregations.get(random.nextInt(c.getColumnType().aggregations.size()));
-    innerQuery.addProjection(aggregation + "(\"" + t1.getTableName() + "\".\"" + c.getColumnName() + "\")");
+    innerQuery.addProjection(aggregation + "(" + c.getColumnName() + ")");
 
     predicates.addAll(getRandomPredicates(t1, false));
     predicates.forEach(innerQuery::addPredicate);
@@ -176,8 +173,7 @@ public class TPCHQueryGeneratorV2 {
       String name = column.getColumnName();
       ColumnType columnType = column.getColumnType();
       String operator = columnType.operators.get(random.nextInt(columnType.operators.size()));
-      String predicateBuilder =
-          " \"" + t1.getTableName() + "\".\"" + name + "\" " + operator + " " + getRandomValueForPredicate(t1, column,
+      String predicateBuilder = name + " " + operator + " " + getRandomValueForPredicate(t1, column,
               useNestedQueries) + " ";
       results.add(predicateBuilder);
     }
@@ -199,7 +195,7 @@ public class TPCHQueryGeneratorV2 {
       orderBys.add(column.getColumnName());
       String name = column.getColumnName();
       StringBuilder orderByBuilder = new StringBuilder();
-      orderByBuilder.append(" \"").append(t1.getTableName()).append("\".\"").append(name).append("\" ");
+      orderByBuilder.append(name).append(" ");
       if (random.nextBoolean()) {
         orderByBuilder.append(" DESC ");
       }
@@ -265,12 +261,10 @@ public class TPCHQueryGeneratorV2 {
     Table t2 = tables.get(rt.getForeignTableName());
     getRandomProjections(t1).forEach(querySkeleton::addProjection);
     getRandomProjections(t2).forEach(querySkeleton::addProjection);
-    StringBuilder t2NameWithJoin = new StringBuilder();
-    t2NameWithJoin.append(t1.getTableName()).append(" ").append(joinTypes[random.nextInt(joinTypes.length)])
-        .append(" ").append(t2.getTableName()).append(" ON ");
-    t2NameWithJoin.append(" \"").append(t1.getTableName()).append("\".\"").append(rt.getLocalTableKey()).append("\" = ");
-    t2NameWithJoin.append(" \"").append(t2.getTableName()).append("\".\"").append(rt.getForeignTableKey()).append("\" ");
-    querySkeleton.addTable(t2NameWithJoin.toString());
+    String t2NameWithJoin =
+        t1.getTableName() + " " + joinTypes[random.nextInt(joinTypes.length)] + " " + t2.getTableName() + " ON "
+            + rt.getLocalTableKey() + " = " + rt.getForeignTableKey() + " ";
+    querySkeleton.addTable(t2NameWithJoin);
 
     if (includePredicates) {
       getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
@@ -300,11 +294,11 @@ public class TPCHQueryGeneratorV2 {
           // Use as aggregation
           String aggregation =
               column.getColumnType().aggregations.get(random.nextInt(column.getColumnType().aggregations.size()));
-          resultProjections.add(aggregation + "(\"" + t1.getTableName() + "\".\"" + columnName + "\")");
+          resultProjections.add(aggregation + "(" + columnName + ")");
         } else {
           // Use as group by
-          groupByColumns.add("\"" + t1.getTableName() + "\".\"" + columnName + "\"");
-          resultProjections.add("\"" + t1.getTableName() + "\".\"" + columnName + "\"");
+          groupByColumns.add(columnName);
+          resultProjections.add(columnName);
         }
         selectedColumns.add(columnName);
       }
@@ -352,8 +346,8 @@ public class TPCHQueryGeneratorV2 {
     querySkeleton.addTable(t1.getTableName()
         + "  " + joinTypes[random.nextInt(joinTypes.length)]
         + " " + t2.getTableName() + " ON "
-        + " \"" + t1.getTableName() + "\".\"" + rt.getLocalTableKey() + "\" = "
-        + " \"" + t2.getTableName() + "\".\"" + rt.getForeignTableKey() + "\" ");
+        + " " + rt.getLocalTableKey() + " = "
+        + " " + rt.getForeignTableKey() + " ");
     groupByColumns.getRight().forEach(querySkeleton::addGroupByColumn);
     groupByColumnsT2.getRight().forEach(querySkeleton::addGroupByColumn);
 
@@ -397,8 +391,8 @@ public class TPCHQueryGeneratorV2 {
       if (!tableNames.contains(relatedTable.getForeignTableName())) {
         tableNames.add(relatedTable.getForeignTableName());
         tables.add(TPCHQueryGeneratorV2.tables.get(relatedTable.getForeignTableName()));
-        predicates.add("\"" + tables.get(tableToAddIdx).getTableName() + "\".\"" + relatedTable.getLocalTableKey() + "\"=\""
-                + relatedTable.getForeignTableName() + "\".\"" + relatedTable.getForeignTableKey() + "\"");
+        predicates.add(relatedTable.getLocalTableKey() + "="
+                + relatedTable.getForeignTableKey());
       }
     }
 
@@ -457,8 +451,7 @@ public class TPCHQueryGeneratorV2 {
         tableNames.add(relatedTable.getForeignTableName());
         tables.add(TPCHQueryGeneratorV2.tables.get(relatedTable.getForeignTableName()));
         predicates.add(
-            "\"" + tables.get(tableToAddIdx).getTableName() + "\".\"" + relatedTable.getLocalTableKey() + "\"=\""
-                + relatedTable.getForeignTableName() + "\".\"" + relatedTable.getForeignTableKey() + "\"");
+            relatedTable.getLocalTableKey() + "=" + relatedTable.getForeignTableKey());
       }
     }
 
