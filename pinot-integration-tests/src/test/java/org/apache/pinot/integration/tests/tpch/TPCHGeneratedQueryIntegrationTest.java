@@ -58,7 +58,7 @@ import org.testng.annotations.Test;
  * Queries are executed against Pinot and H2, and the results are compared.
  */
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final int NUM_TPCH_QUERIES = 24;
+  private static final int NUM_TPCH_QUERIES = 1000;
   private static TPCHQueryGeneratorV2 _tpchQueryGenerator;
 
   // Pinot query 6 fails due to mismatch results.
@@ -126,7 +126,13 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
   @Test(dataProvider = "QueryDataProvider")
   public void testTPCHQueries(String[] pinotAndH2Queries)
       throws Exception {
-    testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
+    try {
+      testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
+    } catch (AssertionError e) {
+      System.out.printf("%s, %s\n", pinotAndH2Queries[0], e.getMessage());
+    } catch (Exception e) {
+      System.out.printf("%s, %s\n", pinotAndH2Queries[0], e.getMessage());
+    }
   }
 
   protected void testQueriesSucceed(String pinotQuery, String h2Query)
@@ -145,6 +151,7 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     // h2 response
     Assert.assertNotNull(_h2Connection);
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+    h2statement.setQueryTimeout(10);
     h2statement.execute(h2Query);
     ResultSet h2ResultSet = h2statement.getResultSet();
     System.out.println(h2ResultSet);

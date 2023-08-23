@@ -43,7 +43,7 @@ public final class TblToAvro {
   private static final String LONG_TYPE = "long";
   private static final String DOUBLE_TYPE = "double";
   private static final String STRING_TYPE = "string";
-  private static final String FOLDER_PATH = "/Users/haitaozhang/Downloads/TPC-H-V3.0.1/dbgen/";
+  private static final String FOLDER_PATH = "/Users/saurabh.dubey/Documents/workspace/stuff/tpch/data/s01/";
   private static final String TBL_FILE_SUFFIX = ".tbl";
   private static final Map<String, String[]> TABLE_NAME_FIELDS_MAP =
       ImmutableMap.of(
@@ -194,7 +194,7 @@ public final class TblToAvro {
       DatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(schema);
       DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter);
       Path avroFilePath = Paths.get(tpchTblFileFolder + tableName + Constants.AVRO_FILE_SUFFIX);
-      Files.delete(avroFilePath);
+      Files.deleteIfExists(avroFilePath);
       OutputStream outputStream = Files.newOutputStream(avroFilePath);
       dataFileWriter.create(schema, outputStream);
 
