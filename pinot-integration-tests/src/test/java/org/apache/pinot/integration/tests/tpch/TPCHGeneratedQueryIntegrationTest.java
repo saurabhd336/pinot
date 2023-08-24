@@ -21,17 +21,16 @@ package org.apache.pinot.integration.tests.tpch;
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.PrintStream;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.sql.ResultSet;
+import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.util.Collections;
-import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
@@ -58,7 +57,7 @@ import org.testng.annotations.Test;
  * Queries are executed against Pinot and H2, and the results are compared.
  */
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final int NUM_TPCH_QUERIES = 1000;
+  private static final int NUM_TPCH_QUERIES = 10000;
   private static TPCHQueryGeneratorV2 _tpchQueryGenerator;
 
   // Pinot query 6 fails due to mismatch results.
@@ -121,28 +120,35 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
         });
     _tpchQueryGenerator = new TPCHQueryGeneratorV2(sampleColumnDataProvider);
     _tpchQueryGenerator.init();
+    File file = new File("/Users/saurabh.dubey/Documents/workspace/stuff/tpch/results/tpch_results.csv");
+    //Instantiating the PrintStream class
+    PrintStream stream = new PrintStream(file);
+    System.setErr(stream);
   }
 
   @Test(dataProvider = "QueryDataProvider")
   public void testTPCHQueries(String[] pinotAndH2Queries)
       throws Exception {
+    String status = "SUCCESS";
+    String failureReason = "NA";
+    long numRows = -1;
     try {
-      testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
-    } catch (AssertionError e) {
-      System.out.printf("%s, %s\n", pinotAndH2Queries[0], e.getMessage());
-    } catch (Exception e) {
-      System.out.printf("%s, %s\n", pinotAndH2Queries[0], e.getMessage());
+      numRows = testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
+    } catch (Throwable t) {
+      status = "FAILED";
+      failureReason = t.getMessage();
+    } finally {
+      System.err.printf("\"%s\",\"%s\",\"%s\", %d\n", pinotAndH2Queries[0], status,
+          StringEscapeUtils.escapeCsv(failureReason).replace(',', ' '), numRows);
     }
   }
 
-  protected void testQueriesSucceed(String pinotQuery, String h2Query)
+  protected long testQueriesSucceed(String pinotQuery, String h2Query)
       throws Exception {
     ResultSetGroup pinotResultSetGroup = getPinotConnection().execute(pinotQuery);
     org.apache.pinot.client.ResultSet resultTableResultSet = pinotResultSetGroup.getResultSet(0);
     if (CollectionUtils.isNotEmpty(pinotResultSetGroup.getExceptions())) {
-      Assert.fail(
-          String.format("TPC-H query raised exception: %s. query: %s", pinotResultSetGroup.getExceptions().get(0),
-              pinotQuery));
+      Assert.fail(pinotResultSetGroup.getExceptions().get(0).toString());
     }
 
     int numRows = resultTableResultSet.getRowCount();
@@ -152,9 +158,13 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     Assert.assertNotNull(_h2Connection);
     Statement h2statement = _h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     h2statement.setQueryTimeout(10);
-    h2statement.execute(h2Query);
+
+    try {
+      h2statement.execute(h2Query);
+    } catch (SQLTimeoutException e) {
+      Assert.fail("H2 query timed out!");
+    }
     ResultSet h2ResultSet = h2statement.getResultSet();
-    System.out.println(h2ResultSet);
 
     // compare results.
     Assert.assertEquals(numColumns, h2ResultSet.getMetaData().getColumnCount());
@@ -165,20 +175,20 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
           String pinotValue = resultTableResultSet.getString(i, c);
           boolean error = ClusterIntegrationTestUtils.fuzzyCompare(h2Value, pinotValue, pinotValue);
           if (error) {
-            Assert.fail(String.format(
-                "Query %s\nValue: %d does not match at (%d, %d), expected h2 value: %s actual Pinot value: %s",
-                pinotQuery, c, i, c, h2Value, pinotValue));
+            Assert.fail(
+                String.format("Value: %d does not match at (%d, %d), expected h2 value: %s actual Pinot value: %s", c,
+                    i, c, h2Value, pinotValue));
           }
         }
         if (!h2ResultSet.next() && i != numRows - 1) {
-          Assert.fail(
-              String.format("Query %s\nH2 result set is smaller than Pinot result set after: %d rows", pinotQuery, i));
+          Assert.fail(String.format("H2 result set is smaller than Pinot result set after: %d rows", i));
         }
       }
     }
     Assert.assertFalse(h2ResultSet.next(),
-        String.format("Query %s \nPinot result set is smaller than H2 result set after: %d rows!", pinotQuery,
-            numRows));
+        String.format("Pinot result set is smaller than H2 result set after: %d rows!", numRows));
+
+    return numRows;
   }
 
   @Override

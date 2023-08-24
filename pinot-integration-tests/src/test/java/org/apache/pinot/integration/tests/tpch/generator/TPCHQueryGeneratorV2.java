@@ -487,7 +487,7 @@ public class TPCHQueryGeneratorV2 {
     Random random = new Random();
     int queryType = random.nextInt(6);
     boolean includePredicates = random.nextBoolean();
-    boolean includeOrderBy = random.nextBoolean();
+    boolean includeOrderBy = true;
     switch (queryType) {
       case 0:
         return generateSelectionOnlyQuery(includePredicates, includeOrderBy);

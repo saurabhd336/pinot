@@ -61,7 +61,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   private final boolean _useMultiStageEngine;
 
   public JsonAsyncHttpPinotClientTransport() {
-    _brokerReadTimeout = 60000;
+    _brokerReadTimeout = 6000;
     _headers = new HashMap<>();
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;

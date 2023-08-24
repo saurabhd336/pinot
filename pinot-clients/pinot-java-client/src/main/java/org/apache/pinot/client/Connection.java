@@ -123,7 +123,7 @@ public class Connection {
     }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, query);
     if (response.hasExceptions() && _failOnExceptions) {
-      throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+      throw new PinotClientException("Query had processing exceptions: " + response.getExceptions());
     }
     return new ResultSetGroup(response);
   }

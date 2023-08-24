@@ -22,7 +22,7 @@ import java.util.List;
  * under the License.
  */
 public enum ColumnType {
-  NUMERIC(List.of("=", "!=", "<", ">", "<=", ">=", "<>"), List.of("max", "min", "avg", "sum")),
+  NUMERIC(List.of("=", "!=", "<", ">", "<=", ">=", "<>"), List.of("max", "min", "avg", "sum", "count")),
   STRING(List.of("=", "!=", "LIKE"), List.of());
 
   List<String> operators;
