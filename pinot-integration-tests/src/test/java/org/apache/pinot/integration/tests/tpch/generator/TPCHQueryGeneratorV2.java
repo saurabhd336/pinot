@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.codehaus.jettison.json.JSONException;
 
 
 public class TPCHQueryGeneratorV2 {
@@ -17,7 +18,7 @@ public class TPCHQueryGeneratorV2 {
   private static List<String> tableNames =
       List.of("nation", "region", "supplier", "customer", "part", "partsupp", "orders", "lineitem");
   private static final String[] joinTypes = {
-      "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "OUTER JOIN", "LEFT OUTER JOIN", "RIGHT OUTER JOIN"
+      "INNER JOIN", "LEFT JOIN", "RIGHT JOIN"
   };
 
   public TPCHQueryGeneratorV2() {
@@ -99,7 +100,14 @@ public class TPCHQueryGeneratorV2 {
     if (_sampleColumnDataProvider != null) {
       tables.forEach((tableName, table) -> {
         table.getColumns().forEach(column -> {
-          column.setSampleValues(_sampleColumnDataProvider.getSampleValues(tableName, column.getColumnName()));
+          Pair<Boolean, List<String>> sampleValues = null;
+          try {
+            sampleValues = _sampleColumnDataProvider.getSampleValues(tableName, column.getColumnName());
+          } catch (JSONException e) {
+            throw new RuntimeException(e);
+          }
+          column.setSampleValues(sampleValues.getRight());
+          column.setMultiValue(sampleValues.getLeft());
         });
       });
     }
@@ -126,64 +134,87 @@ public class TPCHQueryGeneratorV2 {
     return selectedColumns;
   }
 
-  private String generateInnerQueryForPredicate(Table t1, Column c) {
+  private Pair<String, String> generateInnerQueryForPredicate(Table t1, Column c) {
     QuerySkeleton innerQuery = new QuerySkeleton();
+    QuerySkeleton innerQueryPinot = new QuerySkeleton();
+
     Random random = new Random();
     List<String> predicates = new ArrayList<>();
+    List<String> predicatesForPinotQuery = new ArrayList<>();
 
     innerQuery.addTable(t1.getTableName());
+    innerQueryPinot.addTable(t1.getTableName());
     // Limit to maximum of 1 join
     if (random.nextBoolean()) {
       RelatedTable relatedTable = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
       if (relatedTable != null) {
         innerQuery.addTable(relatedTable.getForeignTableName());
+        innerQueryPinot.addTable(relatedTable.getForeignTableName());
         predicates.add(relatedTable.getLocalTableKey() + "=" + relatedTable.getForeignTableKey());
-        predicates.addAll(getRandomPredicates(tables.get(relatedTable.getForeignTableName()), false));
+        predicatesForPinotQuery.add(relatedTable.getLocalTableKey() + "=" + relatedTable.getForeignTableKey());
+
+        Pair<List<String>, List<String>> inp =
+            getRandomPredicates("", tables.get(relatedTable.getForeignTableName()), false);
+        predicates.addAll(inp.getLeft());
+        predicatesForPinotQuery.addAll(inp.getRight());
       }
     }
     String aggregation = c.getColumnType().aggregations.get(random.nextInt(c.getColumnType().aggregations.size()));
     innerQuery.addProjection(aggregation + "(" + c.getColumnName() + ")");
+    innerQueryPinot.addProjection(aggregation + "(" + c.getColumnName() + ")");
 
-    predicates.addAll(getRandomPredicates(t1, false));
+    Pair<List<String>, List<String>> inp = getRandomPredicates("", t1, false);
+
+    predicates.addAll(inp.getLeft());
+    predicatesForPinotQuery.addAll(inp.getRight());
+
     predicates.forEach(innerQuery::addPredicate);
-    return innerQuery.toString();
+    predicatesForPinotQuery.forEach(innerQueryPinot::addPredicate);
+    return Pair.of(innerQuery.toString(), innerQueryPinot.toString());
   }
 
-  private String getRandomValueForPredicate(Table t1, Column c, boolean useNextedQueries) {
+  private Pair<String, String> getRandomValueForPredicate(Table t1, Column c, boolean useNextedQueries) {
     Random random = new Random();
     if (random.nextBoolean() && useNextedQueries && c.getColumnType().aggregations.size() > 0) {
       // Use nested query for predicate
-      return "(" + generateInnerQueryForPredicate(t1, c) + ")";
+      Pair<String, String> nestedQueries = generateInnerQueryForPredicate(t1, c);
+      return Pair.of("(" + nestedQueries.getLeft() + ")", "(" + nestedQueries.getRight() + ")");
     } else {
       if (c.getColumnType() == ColumnType.STRING) {
-        return "'" + c.getRandomStringValue() + "'";
+        String value = "'" + c.getRandomStringValue() + "'";
+        return Pair.of(value, value);
       } else {
-        return String.valueOf(c.getRandomNumericValue());
+        String value = String.valueOf(c.getRandomNumericValue());
+        return Pair.of(value, value);
       }
     }
   }
 
-  private List<String> getRandomPredicates(Table t1, boolean useNestedQueries) {
+  private Pair<List<String>, List<String>> getRandomPredicates(String prefix, Table t1, boolean useNestedQueries) {
     Random random = new Random();
     int predicateCount = random.nextInt(5) + 1;
     List<String> predicates = new ArrayList<>();
     List<String> results = new ArrayList<>();
+    List<String> resultsPinot = new ArrayList<>();
     while (predicates.size() < predicateCount) {
       Column column = t1.getColumns().get(random.nextInt(t1.getColumns().size()));
       predicates.add(column.getColumnName());
-      String name = column.getColumnName();
+      String name = column.getColumnNameForPredicate(prefix);
       ColumnType columnType = column.getColumnType();
       String operator = columnType.operators.get(random.nextInt(columnType.operators.size()));
-      String predicateBuilder = name + " " + operator + " " + getRandomValueForPredicate(t1, column,
-              useNestedQueries) + " ";
+      Pair<String, String> value = getRandomValueForPredicate(t1, column, useNestedQueries);
+      String predicateBuilder = name + " " + operator + " " + value.getLeft() + " ";
       results.add(predicateBuilder);
+      String predicateBuilderPinot =
+          column.getColumnNameForPinotPredicate(prefix) + " " + operator + " " + value.getRight() + " ";
+      resultsPinot.add(predicateBuilderPinot);
     }
 
-    return results;
+    return Pair.of(results, resultsPinot);
   }
 
-  private List<String> getRandomPredicates(Table t1) {
-    return getRandomPredicates(t1, true);
+  private Pair<List<String>, List<String>> getRandomPredicates(Table t1) {
+    return getRandomPredicates("", t1, true);
   }
 
   private List<String> getRandomOrderBys(Table t1) {
@@ -206,21 +237,32 @@ public class TPCHQueryGeneratorV2 {
     return results;
   }
 
-  public String generateSelectionOnlyQuery(boolean includePredicates, boolean includeOrderBy) {
+  public Pair<String, String> generateSelectionOnlyQuery(boolean includePredicates, boolean includeOrderBy) {
     QuerySkeleton querySkeleton = new QuerySkeleton();
+    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
     Table t1 = getRandomTable();
     querySkeleton.addTable(t1.getTableName());
-    getRandomProjections(t1).forEach(querySkeleton::addProjection);
+    pinotQuerySkeleton.addTable(t1.getTableName());
+
+    getRandomProjections(t1).forEach(p -> {
+      querySkeleton.addProjection(p);
+      pinotQuerySkeleton.addProjection(p);
+    });
 
     if (includePredicates) {
-      getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
+      Pair<List<String>, List<String>> predicates = getRandomPredicates(t1);
+      predicates.getLeft().forEach(querySkeleton::addPredicate);
+      predicates.getRight().forEach(pinotQuerySkeleton::addPredicate);
     }
 
     if (includeOrderBy) {
-      getRandomOrderBys(t1).forEach(querySkeleton::addOrderByColumn);
+      getRandomOrderBys(t1).forEach(o -> {
+        querySkeleton.addOrderByColumn(o);
+        pinotQuerySkeleton.addOrderByColumn(o);
+      });
     }
 
-    return querySkeleton.toString();
+    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
   }
 
   private List<String> getRandomOrderBys(Table t1, List<String> groupByCols) {
@@ -247,8 +289,10 @@ public class TPCHQueryGeneratorV2 {
     return result;
   }
 
-  public String selectionOnlyWithJoins(boolean includePredicates, boolean includeOrderBy) {
+  public Pair<String, String> selectionOnlyWithJoins(boolean includePredicates, boolean includeOrderBy) {
     QuerySkeleton querySkeleton = new QuerySkeleton();
+    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
+
     Table t1;
     while (true) {
       t1 = getRandomTable();
@@ -260,24 +304,39 @@ public class TPCHQueryGeneratorV2 {
     Random random = new Random();
     RelatedTable rt = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
     Table t2 = tables.get(rt.getForeignTableName());
-    getRandomProjections(t1).forEach(querySkeleton::addProjection);
-    getRandomProjections(t2).forEach(querySkeleton::addProjection);
+    getRandomProjections(t1).forEach(p -> {
+      querySkeleton.addProjection(p);
+      pinotQuerySkeleton.addProjection(p);
+    });
+    getRandomProjections(t2).forEach(p -> {
+      querySkeleton.addProjection(p);
+      pinotQuerySkeleton.addProjection(p);
+    });
+
     String t2NameWithJoin =
         t1.getTableName() + " " + joinTypes[random.nextInt(joinTypes.length)] + " " + t2.getTableName() + " ON "
             + rt.getLocalTableKey() + " = " + rt.getForeignTableKey() + " ";
     querySkeleton.addTable(t2NameWithJoin);
+    pinotQuerySkeleton.addTable(t2NameWithJoin);
 
     if (includePredicates) {
-      getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
-      getRandomPredicates(t2).forEach(querySkeleton::addPredicate);
+      Pair<List<String>, List<String>> predicates = getRandomPredicates(t1);
+      predicates.getLeft().forEach(querySkeleton::addPredicate);
+      predicates.getRight().forEach(pinotQuerySkeleton::addPredicate);
+
+      predicates = getRandomPredicates(t2);
+      predicates.getLeft().forEach(querySkeleton::addPredicate);
+      predicates.getRight().forEach(pinotQuerySkeleton::addPredicate);
     }
 
     if (includeOrderBy) {
-      getRandomOrderBys(t1).forEach(querySkeleton::addOrderByColumn);
-      getRandomOrderBys(t2).forEach(querySkeleton::addOrderByColumn);
+      getRandomOrderBys(t1).forEach(o -> {
+        querySkeleton.addOrderByColumn(o);
+        pinotQuerySkeleton.addOrderByColumn(o);
+      });
     }
 
-    return querySkeleton.toString();
+    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
   }
 
   private Pair<List<String>, List<String>> getGroupByAndAggregates(Table t1) {
@@ -308,26 +367,43 @@ public class TPCHQueryGeneratorV2 {
     return Pair.of(resultProjections, groupByColumns);
   }
 
-  public String selectionOnlyWithGroupBy(boolean includePredicates, boolean includeOrderBy) {
+  public Pair<String, String> selectionOnlyWithGroupBy(boolean includePredicates, boolean includeOrderBy) {
     QuerySkeleton querySkeleton = new QuerySkeleton();
+    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
+
     Table t1 = getRandomTable();
     Pair<List<String>, List<String>> cols = getGroupByAndAggregates(t1);
-    cols.getLeft().forEach(querySkeleton::addProjection);
+    cols.getLeft().forEach(c -> {
+      querySkeleton.addProjection(c);
+      pinotQuerySkeleton.addProjection(c);
+    });
+
     querySkeleton.addTable(t1.getTableName());
-    cols.getRight().forEach(querySkeleton::addGroupByColumn);
+    pinotQuerySkeleton.addTable(t1.getTableName());
+
+    cols.getRight().forEach(c -> {
+      querySkeleton.addGroupByColumn(c);
+      pinotQuerySkeleton.addGroupByColumn(c);
+    });
     if (includePredicates) {
-      getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
+      Pair<List<String>, List<String>> preds = getRandomPredicates(t1);
+      preds.getLeft().forEach(querySkeleton::addPredicate);
+      preds.getRight().forEach(pinotQuerySkeleton::addPredicate);
     }
 
     if (includeOrderBy && cols.getRight().size() > 0) {
-      getRandomOrderBys(t1, cols.getRight()).forEach(querySkeleton::addOrderByColumn);
+      getRandomOrderBys(t1, cols.getRight()).forEach(ob -> {
+        querySkeleton.addOrderByColumn(ob);
+        pinotQuerySkeleton.addOrderByColumn(ob);
+      });
     }
 
-    return querySkeleton.toString();
+    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
   }
 
-  public String selectionOnlyGroupByWithJoins(boolean includePredicates, boolean includeOrderBy) {
+  public Pair<String, String> selectionOnlyGroupByWithJoins(boolean includePredicates, boolean includeOrderBy) {
     QuerySkeleton querySkeleton = new QuerySkeleton();
+    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
     Table t1;
     while (true) {
       t1 = getRandomTable();
@@ -340,34 +416,57 @@ public class TPCHQueryGeneratorV2 {
     RelatedTable rt = t1.getRelatedTables().get(random.nextInt(t1.getRelatedTables().size()));
     Table t2 = tables.get(rt.getForeignTableName());
     Pair<List<String>, List<String>> groupByColumns = getGroupByAndAggregates(t1);
-    groupByColumns.getLeft().forEach(querySkeleton::addProjection);
+    groupByColumns.getLeft().forEach(c -> {
+      querySkeleton.addProjection(c);
+      pinotQuerySkeleton.addProjection(c);
+    });
+
     Pair<List<String>, List<String>> groupByColumnsT2 = getGroupByAndAggregates(t2);
-    groupByColumnsT2.getLeft().forEach(querySkeleton::addProjection);
+    groupByColumnsT2.getLeft().forEach(c -> {
+      querySkeleton.addProjection(c);
+      pinotQuerySkeleton.addProjection(c);
+    });
 
-    querySkeleton.addTable(t1.getTableName()
-        + "  " + joinTypes[random.nextInt(joinTypes.length)]
-        + " " + t2.getTableName() + " ON "
-        + " " + rt.getLocalTableKey() + " = "
-        + " " + rt.getForeignTableKey() + " ");
-    groupByColumns.getRight().forEach(querySkeleton::addGroupByColumn);
-    groupByColumnsT2.getRight().forEach(querySkeleton::addGroupByColumn);
+    String tName =
+        t1.getTableName() + "  " + joinTypes[random.nextInt(joinTypes.length)] + " " + t2.getTableName() + " ON " + " "
+            + rt.getLocalTableKey() + " = " + " " + rt.getForeignTableKey() + " ";
 
+    querySkeleton.addTable(tName);
+    pinotQuerySkeleton.addTable(tName);
+
+    groupByColumns.getRight().forEach(c -> {
+      querySkeleton.addGroupByColumn(c);
+      pinotQuerySkeleton.addGroupByColumn(c);
+    });
+    groupByColumnsT2.getRight().forEach(c -> {
+      querySkeleton.addGroupByColumn(c);
+      pinotQuerySkeleton.addGroupByColumn(c);
+    });
 
     if (includePredicates) {
-      getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
-      getRandomPredicates(t2).forEach(querySkeleton::addPredicate);
+      Pair<List<String>, List<String>> predicates = getRandomPredicates(t1);
+      predicates.getLeft().forEach(querySkeleton::addPredicate);
+      predicates.getRight().forEach(pinotQuerySkeleton::addPredicate);
     }
 
     if (includeOrderBy) {
-      getRandomOrderBys(t1, groupByColumns.getRight()).forEach(querySkeleton::addOrderByColumn);
-      getRandomOrderBys(t2, groupByColumnsT2.getRight()).forEach(querySkeleton::addOrderByColumn);
+      getRandomOrderBys(t1, groupByColumns.getRight()).forEach(o -> {
+        querySkeleton.addOrderByColumn(o);
+        pinotQuerySkeleton.addOrderByColumn(o);
+      });
+      getRandomOrderBys(t2, groupByColumnsT2.getRight()).forEach(o -> {
+        querySkeleton.addOrderByColumn(o);
+        pinotQuerySkeleton.addOrderByColumn(o);
+      });
     }
 
-    return querySkeleton.toString();
+    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
   }
 
-  public String selectionOnlyMultiJoin(boolean includePredicates, boolean includeOrderBy) {
+  public Pair<String, String> selectionOnlyMultiJoin(boolean includePredicates, boolean includeOrderBy) {
     QuerySkeleton querySkeleton = new QuerySkeleton();
+    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
+
     List<String> predicates = new ArrayList<>();
     List<Table> tables = new ArrayList<>();
     Set<String> tableNames = new HashSet<>();
@@ -398,35 +497,47 @@ public class TPCHQueryGeneratorV2 {
     }
 
     for (Table item : tables) {
-      getRandomProjections(item).forEach(querySkeleton::addProjection);
+      getRandomProjections(item).forEach(p -> {
+        querySkeleton.addProjection(p);
+        pinotQuerySkeleton.addProjection(p);
+      });
     }
     for (Table value : tables) {
       querySkeleton.addTable(value.getTableName());
+      pinotQuerySkeleton.addTable(value.getTableName());
     }
 
     if (predicates.size() > 0) {
       for (String predicate : predicates) {
         querySkeleton.addPredicate(predicate);
+        pinotQuerySkeleton.addPredicate(predicate);
       }
     }
 
     if (includePredicates) {
       for (Table table : tables) {
-        getRandomPredicates(table).forEach(querySkeleton::addPredicate);
+        Pair<List<String>, List<String>> preds = getRandomPredicates(table);
+        preds.getLeft().forEach(querySkeleton::addPredicate);
+        preds.getRight().forEach(pinotQuerySkeleton::addPredicate);
       }
     }
 
     if (includeOrderBy) {
       for (Table table : tables) {
-        getRandomOrderBys(table).forEach(querySkeleton::addOrderByColumn);
+        getRandomOrderBys(table).forEach(o -> {
+          querySkeleton.addOrderByColumn(o);
+          pinotQuerySkeleton.addOrderByColumn(o);
+        });
       }
     }
 
-    return querySkeleton.toString();
+    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
   }
 
-  public String selectionGroupByMultiJoin(boolean includePredicates, boolean includeOrderBy) {
+  public Pair<String, String> selectionGroupByMultiJoin(boolean includePredicates, boolean includeOrderBy) {
     QuerySkeleton querySkeleton = new QuerySkeleton();
+    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
+
     List<String> predicates = new ArrayList<>();
     List<Table> tables = new ArrayList<>();
     Set<String> tableNames = new HashSet<>();
@@ -459,73 +570,117 @@ public class TPCHQueryGeneratorV2 {
     Map<String, List<String>> tableWiseGroupByCols = new HashMap<>();
     for (Table value : tables) {
       Pair<List<String>, List<String>> groupByAndAggregates = getGroupByAndAggregates(value);
-      groupByAndAggregates.getLeft().forEach(querySkeleton::addProjection);
-      groupByAndAggregates.getRight().forEach(querySkeleton::addGroupByColumn);
+      groupByAndAggregates.getLeft().forEach(g -> {
+        querySkeleton.addProjection(g);
+        pinotQuerySkeleton.addProjection(g);
+      });
+      groupByAndAggregates.getRight().forEach(c -> {
+        querySkeleton.addGroupByColumn(c);
+        pinotQuerySkeleton.addGroupByColumn(c);
+      });
       tableWiseGroupByCols.put(value.getTableName(), groupByAndAggregates.getRight());
     }
     for (Table table : tables) {
       querySkeleton.addTable(table.getTableName());
+      pinotQuerySkeleton.addTable(table.getTableName());
     }
-    predicates.forEach(querySkeleton::addPredicate);
+    predicates.forEach(p -> {
+      querySkeleton.addPredicate(p);
+      pinotQuerySkeleton.addPredicate(p);
+    });
 
     if (includePredicates) {
       for (Table table : tables) {
-        getRandomPredicates(table).forEach(querySkeleton::addPredicate);
+        Pair<List<String>, List<String>> preds = getRandomPredicates(table);
+
+        preds.getLeft().forEach(querySkeleton::addPredicate);
+        preds.getRight().forEach(pinotQuerySkeleton::addPredicate);
       }
     }
 
     if (includeOrderBy) {
       for (Table table : tables) {
-        getRandomOrderBys(table, tableWiseGroupByCols.get(table.getTableName())).forEach(
-            querySkeleton::addOrderByColumn);
+        getRandomOrderBys(table, tableWiseGroupByCols.get(table.getTableName())).forEach(o -> {
+          querySkeleton.addOrderByColumn(o);
+          pinotQuerySkeleton.addOrderByColumn(o);
+        });
       }
     }
 
-    return querySkeleton.toString();
+    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
   }
 
-  public String selectionGroupBySelfJoin(boolean includePredicates, boolean includeOrderBy) {
-    Table t1 = getRandomTable();
+//  public Pair<String, String> selectionGroupBySelfJoin(boolean includePredicates, boolean includeOrderBy) {
+//    Table t1 = getRandomTable();
+//
+//    QuerySkeleton querySkeleton = new QuerySkeleton();
+//    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
+//
+//    Pair<List<String>, List<String>> groupByAndAggregates = getGroupByAndAggregates(t1);
+//    groupByAndAggregates.getLeft().forEach(p -> {
+//      querySkeleton.addProjection("t1." + p);
+//      pinotQuerySkeleton.addProjection("t1." + p);
+//    });
+//    groupByAndAggregates.getRight().forEach(g -> {
+//      querySkeleton.addGroupByColumn("t1." + g);
+//      pinotQuerySkeleton.addGroupByColumn("t1." + g);
+//    });
+//    String col = t1.getColumns().get(_random.nextInt(t1.getColumns().size())).getColumnName();
+//    String tName =
+//        t1.getTableName() + " as t1 " + joinTypes[_random.nextInt(joinTypes.length)] + " " + t1.getTableName()
+//            + " as t2 ON t1." + col + " = t2." + col + " ";
+//    querySkeleton.addTable(tName);
+//    pinotQuerySkeleton.addTable(tName);
+//
+//    if (includeOrderBy) {
+//      getRandomOrderBys(t1, groupByAndAggregates.getRight()).forEach(o -> {
+//        querySkeleton.addOrderByColumn("t1." + o);
+//        pinotQuerySkeleton.addOrderByColumn("t1." + o);
+//      });
+//    }
+//
+//    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
+//  }
 
-    QuerySkeleton querySkeleton = new QuerySkeleton();
-    Pair<List<String>, List<String>> groupByAndAggregates = getGroupByAndAggregates(t1);
-    groupByAndAggregates.getLeft().forEach(querySkeleton::addProjection);
-    groupByAndAggregates.getRight().forEach(querySkeleton::addGroupByColumn);
-    String col = t1.getColumns().get(_random.nextInt(t1.getColumns().size())).getColumnName();
-    querySkeleton.addTable(
-        t1.getTableName() + " " + joinTypes[_random.nextInt(joinTypes.length)] + " " + t1.getTableName() + " ON " + col
-            + " = " + col + " ");
+//  public Pair<String, String> selectionOnlySelfJoin(boolean includePredicates, boolean includeOrderBy) {
+//    Table t1 = getRandomTable();
+//    String col = t1.getColumns().get(_random.nextInt(t1.getColumns().size())).getColumnName();
+//    QuerySkeleton querySkeleton = new QuerySkeleton();
+//    QuerySkeleton pinotQuerySkeleton = new QuerySkeleton();
+//
+//    getRandomProjections(t1).forEach(p -> {
+//      querySkeleton.addProjection("t1." + p);
+//      pinotQuerySkeleton.addProjection("t1." + p);
+//    });
+//    String tName =
+//        t1.getTableName() + " as t1 " + joinTypes[_random.nextInt(joinTypes.length)] + " " + t1.getTableName()
+//            + " as t2 ON t1." + col + " = t2." + col + " ";
+//    querySkeleton.addTable(tName);
+//    pinotQuerySkeleton.addTable(tName);
+//
+//    if (includePredicates) {
+//      Pair<List<String>, List<String>> predicates = getRandomPredicates("t1", t1, true);
+//      predicates.getLeft().forEach(p -> {
+//        querySkeleton.addPredicate(p);
+//      });
+//      predicates.getRight().forEach(p -> {
+//        pinotQuerySkeleton.addPredicate(p);
+//      });
+//    }
+//
+//    if (includeOrderBy) {
+//      getRandomOrderBys(t1).forEach(o -> {
+//        querySkeleton.addOrderByColumn("t1." + o);
+//        pinotQuerySkeleton.addOrderByColumn("t1." + o);
+//      });
+//    }
+//
+//    return Pair.of(querySkeleton.toString(), pinotQuerySkeleton.toString());
+//  }
 
-    if (includeOrderBy) {
-      getRandomOrderBys(t1, groupByAndAggregates.getRight()).forEach(querySkeleton::addOrderByColumn);
-    }
-
-    return querySkeleton.toString();
-  }
-
-  public String selectionOnlySelfJoin(boolean includePredicates, boolean includeOrderBy) {
-    Table t1 = getRandomTable();
-    String col = t1.getColumns().get(_random.nextInt(t1.getColumns().size())).getColumnName();
-    QuerySkeleton querySkeleton = new QuerySkeleton();
-    getRandomProjections(t1).forEach(querySkeleton::addProjection);
-    querySkeleton.addTable(
-        t1.getTableName() + " " + joinTypes[_random.nextInt(joinTypes.length)] + " " + t1.getTableName() + " ON " + col
-            + " = " + col + " ");
-
-    if (includePredicates) {
-      getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
-    }
-
-    if (includeOrderBy) {
-      getRandomOrderBys(t1).forEach(querySkeleton::addOrderByColumn);
-    }
-
-    return querySkeleton.toString();
-  }
-
-  public String generateRandomQuery() {
+  public Pair<String, String> generateRandomQuery() {
     Random random = new Random();
-    int queryType = random.nextInt(8);
+    int queryType = random.nextInt(6);
     boolean includePredicates = random.nextBoolean();
     boolean includeOrderBy = true;
     switch (queryType) {
@@ -541,23 +696,23 @@ public class TPCHQueryGeneratorV2 {
         return selectionOnlyMultiJoin(includePredicates, includeOrderBy);
       case 5:
         return selectionGroupByMultiJoin(includePredicates, includeOrderBy);
-      case 6:
-        return selectionOnlySelfJoin(includePredicates, includeOrderBy);
-      case 7:
-        return selectionGroupBySelfJoin(includePredicates, includeOrderBy);
+//      case 6:
+//        return selectionOnlySelfJoin(includePredicates, includeOrderBy);
+//      case 7:
+//        return selectionGroupBySelfJoin(includePredicates, includeOrderBy);
       default:
         return generateSelectionOnlyQuery(includePredicates, includeOrderBy);
     }
   }
 
-  private static int SELECTION_ONLY_QUEIES = 200;
-  private static int SELECTION_ONLY_WITH_JOINS_QUERIES = 200;
-  private static int SELECTION_ONLY_GROUP_BY_QUERIES = 200;
-  private static int SELECTION_ONLY_GROUP_BY_WITH_PREDICATES_QUERIES = 100;
-  private static int SELECTION_ONLY_MULTI_JOIN_PREDICATES_QUERIES = 5;
-  private static int SELECITION_GROUP_BY_MULTI_JOIN_PREDICATES_QUERIES = 5;
-  private static int SELECTION_ONLY_SELF_JOIN = 5;
-  private static int SELECTION_ONLY_GROUP_BY_SELF_JOIN = 5;
+  private static int SELECTION_ONLY_QUEIES = 1;
+  private static int SELECTION_ONLY_WITH_JOINS_QUERIES = 1;
+  private static int SELECTION_ONLY_GROUP_BY_QUERIES = 1;
+  private static int SELECTION_ONLY_GROUP_BY_WITH_PREDICATES_QUERIES = 1;
+  private static int SELECTION_ONLY_MULTI_JOIN_PREDICATES_QUERIES = 1;
+  private static int SELECITION_GROUP_BY_MULTI_JOIN_PREDICATES_QUERIES = 1;
+  private static int SELECTION_ONLY_SELF_JOIN = 1;
+  private static int SELECTION_ONLY_GROUP_BY_SELF_JOIN = 1;
 
   public static void main(String[] args) {
     TPCHQueryGeneratorV2 tpchQueryGenerator = new TPCHQueryGeneratorV2();
@@ -603,16 +758,16 @@ public class TPCHQueryGeneratorV2 {
       printQuery(tpchQueryGenerator.selectionGroupByMultiJoin(true, true));
     }
 
-    for (int i = 0; i < SELECTION_ONLY_SELF_JOIN; i++) {
-      printQuery(tpchQueryGenerator.selectionOnlySelfJoin(true, true));
-    }
-
-    for (int i = 0; i < SELECTION_ONLY_GROUP_BY_SELF_JOIN; i++) {
-      printQuery(tpchQueryGenerator.selectionGroupBySelfJoin(true, true));
-    }
+//    for (int i = 0; i < SELECTION_ONLY_SELF_JOIN; i++) {
+//      printQuery(tpchQueryGenerator.selectionOnlySelfJoin(true, true));
+//    }
+//
+//    for (int i = 0; i < SELECTION_ONLY_GROUP_BY_SELF_JOIN; i++) {
+//      printQuery(tpchQueryGenerator.selectionGroupBySelfJoin(true, true));
+//    }
   }
 
-  private static void printQuery(String query) {
+  private static void printQuery(Pair<String, String> query) {
     System.out.printf("%s\n\n", query);
   }
 }

@@ -29,6 +29,7 @@ public class Column {
   private final ColumnType columnType;
   private List<String> _sampleValues;
   private static final Random random = new Random();
+  private boolean _isMultiValue;
 
   public Column(String columnName, ColumnType columnType) {
     this.columnName = columnName;
@@ -52,6 +53,14 @@ public class Column {
     }
   }
 
+  public boolean isMultiValue() {
+    return _isMultiValue;
+  }
+
+  public void setMultiValue(boolean isMultiValue) {
+    _isMultiValue = isMultiValue;
+  }
+
   public void setSampleValues(List<String> sampleValues) {
     _sampleValues = sampleValues;
   }
@@ -60,12 +69,24 @@ public class Column {
     return columnName;
   }
 
+  public String getColumnNameForPredicate(String prefix) {
+    return prefix + columnName;
+  }
+
+  public String getColumnNameForPinotPredicate(String prefix) {
+    if (isMultiValue()) {
+      return "arrayToMv(" + prefix + columnName + ")";
+    } else {
+      return prefix + columnName;
+    }
+  }
+
   public ColumnType getColumnType() {
     return columnType;
   }
 
   public String getRandomStringValue() {
-    return String.valueOf(_sampleValues.get(random.nextInt(_sampleValues.size())));
+    return _sampleValues.get(random.nextInt(_sampleValues.size()));
   }
 
   public long getRandomNumericValue() {

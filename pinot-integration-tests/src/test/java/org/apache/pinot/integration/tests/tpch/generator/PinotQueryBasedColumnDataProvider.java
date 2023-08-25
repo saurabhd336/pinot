@@ -20,7 +20,11 @@ package org.apache.pinot.integration.tests.tpch.generator;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.ResultSet;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 
 
 public class PinotQueryBasedColumnDataProvider implements SampleColumnDataProvider {
@@ -37,8 +41,10 @@ public class PinotQueryBasedColumnDataProvider implements SampleColumnDataProvid
   }
 
   @Override
-  public List<String> getSampleValues(String tableName, String columnName) {
+  public Pair<Boolean, List<String>> getSampleValues(String tableName, String columnName)
+      throws JSONException {
     String countStarQuery = String.format(COUNT_START_QUERY_FORMAT, tableName);
+    boolean isMultiValue = false;
     int count = _pinotConnectionProvider.getConnection().execute(countStarQuery).getResultSet(0).getInt(0);
 
     StringBuilder randomDocIds = new StringBuilder();
@@ -56,9 +62,16 @@ public class PinotQueryBasedColumnDataProvider implements SampleColumnDataProvid
     ResultSet resultSet = _pinotConnectionProvider.getConnection().execute(query).getResultSet(0);
 
     for (int i = 0; i < resultSet.getRowCount(); i++) {
-      columnValues.add(resultSet.getString(i));
+      if (resultSet.getColumnDataType(0).contains("ARRAY")) {
+        String array = resultSet.getString(i, 0);
+        JSONArray jsnobject = new JSONArray(array);
+        columnValues.add(jsnobject.get(0).toString());
+        isMultiValue = true;
+      } else {
+        columnValues.add(resultSet.getString(i, 0));
+      }
     }
 
-    return columnValues;
+    return Pair.of(isMultiValue, columnValues);
   }
 }

@@ -19,7 +19,11 @@
 package org.apache.pinot.integration.tests.tpch.generator;
 
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
+import org.codehaus.jettison.json.JSONException;
+
 
 public interface SampleColumnDataProvider {
-  List<String> getSampleValues(String tableName, String columnName);
+  Pair<Boolean, List<String>> getSampleValues(String tableName, String columnName)
+      throws JSONException;
 }

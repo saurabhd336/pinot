@@ -31,6 +31,7 @@ import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
@@ -59,6 +60,7 @@ import org.testng.annotations.Test;
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_TPCH_QUERIES = 10000;
   private static TPCHQueryGeneratorV2 _tpchQueryGenerator;
+  private static final Boolean useMultiValue = true;
 
   // Pinot query 6 fails due to mismatch results.
   // Pinot queries 15, 16, 17 fail due to lack of support for views.
@@ -80,7 +82,7 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     for (String tableName : Constants.TPCH_TABLE_NAMES) {
       File tableSegmentDir = new File(_segmentDir, tableName);
       File tarDir = new File(_tarDir, tableName);
-      String tableResourceFolder = Constants.getTableResourceFolder(tableName);
+      String tableResourceFolder = Constants.getTableResourceFolder(tableName, useMultiValue);
       URL resourceUrl = getClass().getClassLoader().getResource(tableResourceFolder);
       Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResourceFolder);
       File resourceFile;
@@ -94,7 +96,7 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
         resourceFile = new File(resourceUrl.getFile());
       }
       File dataFile =
-          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName)).getFile());
+          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName, true)).getFile());
       Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
       File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
@@ -133,13 +135,13 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     String failureReason = "NA";
     long numRows = -1;
     try {
-      numRows = testQueriesSucceed(pinotAndH2Queries[0], pinotAndH2Queries[1]);
+      numRows = testQueriesSucceed(pinotAndH2Queries[1], pinotAndH2Queries[0]);
     } catch (Throwable t) {
       status = "FAILED";
       failureReason = t.getMessage();
     } finally {
-      System.err.printf("\"%s\",\"%s\",\"%s\", %d\n", pinotAndH2Queries[0], status,
-          StringEscapeUtils.escapeCsv(failureReason).replace(',', ' '), numRows);
+      System.err.printf("\"%s\",\"%s\",\"%s\", %d\n", pinotAndH2Queries[1], status,
+          StringEscapeUtils.escapeJavaScript(failureReason).replace(',', ' '), numRows);
     }
   }
 
@@ -229,8 +231,9 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
     Object[][] queries = new Object[NUM_TPCH_QUERIES][];
     for (int i = 0; i < NUM_TPCH_QUERIES; i++) {
       queries[i] = new Object[2];
-      queries[i][0] = _tpchQueryGenerator.generateRandomQuery();
-      queries[i][1] = queries[i][0];
+      Pair<String, String> query = _tpchQueryGenerator.generateRandomQuery();
+      queries[i][0] = query.getLeft();
+      queries[i][1] = query.getRight();
     }
 
     return queries;

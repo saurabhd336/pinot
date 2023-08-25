@@ -75,7 +75,7 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
     for (String tableName : Constants.TPCH_TABLE_NAMES) {
       File tableSegmentDir = new File(_segmentDir, tableName);
       File tarDir = new File(_tarDir, tableName);
-      String tableResourceFolder = Constants.getTableResourceFolder(tableName);
+      String tableResourceFolder = Constants.getTableResourceFolder(tableName, false);
       URL resourceUrl = getClass().getClassLoader().getResource(tableResourceFolder);
       Assert.assertNotNull(resourceUrl, "Unable to find resource from: " + tableResourceFolder);
       File resourceFile;

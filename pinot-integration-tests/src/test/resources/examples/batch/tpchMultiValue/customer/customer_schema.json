@@ -1,0 +1,42 @@
+{
+  "schemaName": "customer",
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "name": "c_acctbal"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "c_custkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "c_name",
+      "singleValueField":false
+    },
+    {
+      "dataType": "STRING",
+      "name": "c_address",
+      "singleValueField":false
+    },
+    {
+      "dataType": "INT",
+      "name": "c_nationkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "c_phone"
+    },
+    {
+      "dataType": "STRING",
+      "name": "c_mktsegment",
+      "singleValueField":false
+    },
+    {
+      "dataType": "STRING",
+      "name": "c_comment"
+    }
+  ]
+}
