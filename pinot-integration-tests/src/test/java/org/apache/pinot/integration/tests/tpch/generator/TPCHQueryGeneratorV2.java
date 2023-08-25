@@ -13,10 +13,11 @@ import org.apache.commons.lang3.tuple.Pair;
 public class TPCHQueryGeneratorV2 {
   private final SampleColumnDataProvider _sampleColumnDataProvider;
   private static Map<String, Table> tables = new HashMap<>();
+  private final Random _random = new Random();
   private static List<String> tableNames =
       List.of("nation", "region", "supplier", "customer", "part", "partsupp", "orders", "lineitem");
   private static final String[] joinTypes = {
-      "INNER JOIN", "LEFT JOIN", "RIGHT JOIN"
+      "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "OUTER JOIN", "LEFT OUTER JOIN", "RIGHT OUTER JOIN"
   };
 
   public TPCHQueryGeneratorV2() {
@@ -483,9 +484,48 @@ public class TPCHQueryGeneratorV2 {
     return querySkeleton.toString();
   }
 
+  public String selectionGroupBySelfJoin(boolean includePredicates, boolean includeOrderBy) {
+    Table t1 = getRandomTable();
+
+    QuerySkeleton querySkeleton = new QuerySkeleton();
+    Pair<List<String>, List<String>> groupByAndAggregates = getGroupByAndAggregates(t1);
+    groupByAndAggregates.getLeft().forEach(querySkeleton::addProjection);
+    groupByAndAggregates.getRight().forEach(querySkeleton::addGroupByColumn);
+    String col = t1.getColumns().get(_random.nextInt(t1.getColumns().size())).getColumnName();
+    querySkeleton.addTable(
+        t1.getTableName() + " " + joinTypes[_random.nextInt(joinTypes.length)] + " " + t1.getTableName() + " ON " + col
+            + " = " + col + " ");
+
+    if (includeOrderBy) {
+      getRandomOrderBys(t1, groupByAndAggregates.getRight()).forEach(querySkeleton::addOrderByColumn);
+    }
+
+    return querySkeleton.toString();
+  }
+
+  public String selectionOnlySelfJoin(boolean includePredicates, boolean includeOrderBy) {
+    Table t1 = getRandomTable();
+    String col = t1.getColumns().get(_random.nextInt(t1.getColumns().size())).getColumnName();
+    QuerySkeleton querySkeleton = new QuerySkeleton();
+    getRandomProjections(t1).forEach(querySkeleton::addProjection);
+    querySkeleton.addTable(
+        t1.getTableName() + " " + joinTypes[_random.nextInt(joinTypes.length)] + " " + t1.getTableName() + " ON " + col
+            + " = " + col + " ");
+
+    if (includePredicates) {
+      getRandomPredicates(t1).forEach(querySkeleton::addPredicate);
+    }
+
+    if (includeOrderBy) {
+      getRandomOrderBys(t1).forEach(querySkeleton::addOrderByColumn);
+    }
+
+    return querySkeleton.toString();
+  }
+
   public String generateRandomQuery() {
     Random random = new Random();
-    int queryType = random.nextInt(6);
+    int queryType = random.nextInt(8);
     boolean includePredicates = random.nextBoolean();
     boolean includeOrderBy = true;
     switch (queryType) {
@@ -501,6 +541,10 @@ public class TPCHQueryGeneratorV2 {
         return selectionOnlyMultiJoin(includePredicates, includeOrderBy);
       case 5:
         return selectionGroupByMultiJoin(includePredicates, includeOrderBy);
+      case 6:
+        return selectionOnlySelfJoin(includePredicates, includeOrderBy);
+      case 7:
+        return selectionGroupBySelfJoin(includePredicates, includeOrderBy);
       default:
         return generateSelectionOnlyQuery(includePredicates, includeOrderBy);
     }
@@ -512,6 +556,8 @@ public class TPCHQueryGeneratorV2 {
   private static int SELECTION_ONLY_GROUP_BY_WITH_PREDICATES_QUERIES = 100;
   private static int SELECTION_ONLY_MULTI_JOIN_PREDICATES_QUERIES = 5;
   private static int SELECITION_GROUP_BY_MULTI_JOIN_PREDICATES_QUERIES = 5;
+  private static int SELECTION_ONLY_SELF_JOIN = 5;
+  private static int SELECTION_ONLY_GROUP_BY_SELF_JOIN = 5;
 
   public static void main(String[] args) {
     TPCHQueryGeneratorV2 tpchQueryGenerator = new TPCHQueryGeneratorV2();
@@ -555,6 +601,14 @@ public class TPCHQueryGeneratorV2 {
 
     for (int i = 0; i < SELECITION_GROUP_BY_MULTI_JOIN_PREDICATES_QUERIES; i++) {
       printQuery(tpchQueryGenerator.selectionGroupByMultiJoin(true, true));
+    }
+
+    for (int i = 0; i < SELECTION_ONLY_SELF_JOIN; i++) {
+      printQuery(tpchQueryGenerator.selectionOnlySelfJoin(true, true));
+    }
+
+    for (int i = 0; i < SELECTION_ONLY_GROUP_BY_SELF_JOIN; i++) {
+      printQuery(tpchQueryGenerator.selectionGroupBySelfJoin(true, true));
     }
   }
 
