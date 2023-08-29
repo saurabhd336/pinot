@@ -1,0 +1,24 @@
+{
+  "tableName": "transformsAndAggregationsTest",
+  "tableType": "OFFLINE",
+  "tenants": {
+  },
+  "segmentsConfig": {
+    "segmentPushType": "REFRESH",
+    "replication": "1",
+    "schemaName": "transformsAndAggregationsTest"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "invertedIndexColumns": [
+    ]
+  },
+  "ingestionConfig": {
+    "transformConfigs": [
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

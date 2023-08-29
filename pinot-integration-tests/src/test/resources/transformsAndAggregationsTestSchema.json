@@ -1,0 +1,57 @@
+{
+  "schemaName": "transformsAndAggregationsTest",
+  "metricFieldSpecs": [
+
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "intSv"
+    },
+    {
+      "dataType": "LONG",
+      "name": "longSv"
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "floatSv"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "doubleSv"
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringSv"
+    },
+    {
+      "dataType": "BOOLEAN",
+      "name": "booleanSv"
+    },
+    {
+      "dataType": "INT",
+      "name": "intMv",
+      "singleValueField": false
+    },
+    {
+      "dataType": "LONG",
+      "name": "longMv",
+      "singleValueField": false
+    },
+    {
+      "dataType": "FLOAT",
+      "name": "floatMv",
+      "singleValueField": false
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "doubleMv",
+      "singleValueField": false
+    },
+    {
+      "dataType": "STRING",
+      "name": "stringMv",
+      "singleValueField": false
+    }
+  ]
+}
