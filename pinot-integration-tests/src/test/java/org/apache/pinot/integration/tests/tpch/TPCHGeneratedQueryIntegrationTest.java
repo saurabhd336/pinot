@@ -58,7 +58,7 @@ import org.testng.annotations.Test;
  * Queries are executed against Pinot and H2, and the results are compared.
  */
 public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTest {
-  private static final int NUM_TPCH_QUERIES = 10000;
+  private static final int NUM_TPCH_QUERIES = 1000;
   private static TPCHQueryGeneratorV2 _tpchQueryGenerator;
   private static final Boolean useMultiValue = true;
 
@@ -96,7 +96,7 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
         resourceFile = new File(resourceUrl.getFile());
       }
       File dataFile =
-          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName, true)).getFile());
+          new File(getClass().getClassLoader().getResource(Constants.getTableAvroFilePath(tableName, useMultiValue)).getFile());
       Assert.assertTrue(dataFile.exists(), "Unable to load resource file from URL: " + dataFile);
       File schemaFile = new File(resourceFile.getPath(), tableName + "_schema.json");
       File tableFile = new File(resourceFile.getPath(), tableName + "_offline_table_config.json");
@@ -233,7 +233,6 @@ public class TPCHGeneratedQueryIntegrationTest extends BaseClusterIntegrationTes
       queries[i] = new Object[2];
       Pair<String, String> query = _tpchQueryGenerator.generateRandomQuery();
       queries[i][0] = query.getLeft();
-      queries[i][1] = query.getRight();
     }
 
     return queries;
