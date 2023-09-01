@@ -64,7 +64,6 @@ import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,15 +86,14 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
-      Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator,
-      boolean traceEnabled)
+      Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator)
       throws Exception {
     long requestId = context.getRequestId();
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, queryOptions);
       long reduceStartTimeNs = System.nanoTime();
       ResultTable resultTable =
-          runReducer(requestId, dispatchableSubPlan, timeoutMs, executionStatsAggregator, traceEnabled,
+          runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, executionStatsAggregator,
               _mailboxService);
       context.setReduceTimeNanos(System.nanoTime() - reduceStartTimeNs);
       return resultTable;
@@ -184,7 +182,8 @@ public class QueryDispatcher {
 
   @VisibleForTesting
   public static ResultTable runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
-      Map<Integer, ExecutionStatsAggregator> statsAggregatorMap, boolean traceEnabled, MailboxService mailboxService) {
+      Map<String, String> queryOptions, @Nullable Map<Integer, ExecutionStatsAggregator> statsAggregatorMap,
+      MailboxService mailboxService) {
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(0);
     PlanFragment planFragment = dispatchablePlanFragment.getPlanFragment();
@@ -199,8 +198,8 @@ public class QueryDispatcher {
         .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
     OpChainExecutionContext opChainExecutionContext =
         new OpChainExecutionContext(mailboxService, requestId, planFragment.getFragmentId(),
-            workerMetadataList.get(0).getVirtualServerAddress(), System.currentTimeMillis() + timeoutMs, stageMetadata,
-            null, traceEnabled);
+            workerMetadataList.get(0).getVirtualServerAddress(), System.currentTimeMillis() + timeoutMs, queryOptions,
+            stageMetadata, null);
     MailboxReceiveOperator receiveOperator =
         new MailboxReceiveOperator(opChainExecutionContext, receiveNode.getDistributionType(),
             receiveNode.getSenderStageId());
@@ -210,9 +209,9 @@ public class QueryDispatcher {
     return resultTable;
   }
 
-  private static void collectStats(DispatchableSubPlan dispatchableSubPlan, @Nullable OpChainStats opChainStats,
+  private static void collectStats(DispatchableSubPlan dispatchableSubPlan, OpChainStats opChainStats,
       @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
-    if (executionStatsAggregatorMap != null && opChainStats != null) {
+    if (executionStatsAggregatorMap != null) {
       LOGGER.info("Extracting broker query execution stats, Runtime: {}ms", opChainStats.getExecutionTime());
       for (Map.Entry<String, OperatorStats> entry : opChainStats.getOperatorStatsMap().entrySet()) {
         OperatorStats operatorStats = entry.getValue();
@@ -249,21 +248,17 @@ public class QueryDispatcher {
       int numRows = dataBlock.getNumberOfRows();
       if (numRows > 0) {
         resultRows.ensureCapacity(resultRows.size() + numRows);
-        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
-        for (int i = 0; i < numColumns; i++) {
-          nullBitmaps[i] = dataBlock.getNullRowIds(resultFields.get(i).left);
-        }
         List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock, ObjectSerDeUtils::deserialize);
-        int rowId = 0;
         for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];
           for (int i = 0; i < numColumns; i++) {
-            if (nullBitmaps[i] == null || !nullBitmaps[i].contains(rowId)) {
-              row[i] = columnTypes[i].convertAndFormat(rawRow[resultFields.get(i).left]);
+            Object rawValue = rawRow[resultFields.get(i).left];
+            if (rawValue != null) {
+              ColumnDataType dataType = columnTypes[i];
+              row[i] = dataType.format(dataType.toExternal(rawValue));
             }
           }
           resultRows.add(row);
-          rowId++;
         }
       }
       block = receiveOperator.nextBlock();

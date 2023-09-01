@@ -1,0 +1,20 @@
+{
+  "schemaName": "region",
+  "metricFieldSpecs": [
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "r_regionkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "r_name",
+      "singleValueField":false
+    },
+    {
+      "dataType": "STRING",
+      "name": "r_comment"
+    }
+  ]
+}

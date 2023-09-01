@@ -30,10 +30,12 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -46,6 +48,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.block.DataBlockValSet;
 import org.apache.pinot.query.runtime.operator.block.FilteredDataBlockValSet;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -70,7 +73,6 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Note: This class performs aggregation over the double value of input.
  * If the input is single value, the output type will be input type. Otherwise, the output type will be double.
  */
-// TODO(Sonam): Rename to AggregateOperator when merging Planner support.
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
 
@@ -132,9 +134,12 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     if (!groupSet.isEmpty()) {
       _isGroupByAggregation = true;
+      StageMetadata stageMetadata = context.getStageMetadata();
+      Map<String, String> customProperties =
+          stageMetadata != null ? stageMetadata.getCustomProperties() : Collections.emptyMap();
       _groupByExecutor =
           new MultistageGroupByExecutor(groupByExpr, aggFunctions, filterArgIndexArray, aggType, _colNameToIndexMap,
-              _resultSchema);
+              _resultSchema, customProperties, nodeHint);
     } else {
       _isGroupByAggregation = false;
       _aggregationExecutor =
@@ -181,18 +186,22 @@ public class AggregateOperator extends MultiStageOperator {
   }
 
   private TransferableBlock produceAggregatedBlock() {
-    List<Object[]> rows = _isGroupByAggregation ? _groupByExecutor.getResult() : _aggregationExecutor.getResult();
-
     _hasReturnedAggregateBlock = true;
-    if (rows.size() == 0) {
-      if (!_isGroupByAggregation) {
-        Object[] row = _aggregationExecutor.constructEmptyAggResultRow();
-        return new TransferableBlock(Collections.singletonList(row), _resultSchema, DataBlock.Type.ROW);
-      } else {
+    if (_isGroupByAggregation) {
+      List<Object[]> rows = _groupByExecutor.getResult();
+      if (rows.isEmpty()) {
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      } else {
+        TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+        if (_groupByExecutor.isNumGroupsLimitReached()) {
+          dataBlock.addException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE,
+              String.format("Reached numGroupsLimit of: %d for group-by, ignoring the extra groups",
+                  _groupByExecutor.getNumGroupsLimit()));
+        }
+        return dataBlock;
       }
     } else {
-      return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     }
   }
 
@@ -309,7 +318,7 @@ public class AggregateOperator extends MultiStageOperator {
       case LITERAL: {
         RexExpression.Literal literalRexExp = (RexExpression.Literal) rexExpr;
         Object value = literalRexExp.getValue();
-        exprContext = ExpressionContext.forLiteralContext(literalRexExp.getDataType(), value);
+        exprContext = ExpressionContext.forLiteralContext(literalRexExp.getDataType().toDataType(), value);
         break;
       }
       default:
@@ -335,7 +344,7 @@ public class AggregateOperator extends MultiStageOperator {
       if (expression.getType().equals(ExpressionContext.Type.IDENTIFIER) && !"__PLACEHOLDER__".equals(
           expression.getIdentifier())) {
         int index = colNameToIndexMap.get(expression.getIdentifier());
-        DataSchema.ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
+        ColumnDataType dataType = inputDataSchema.getColumnDataType(index);
         Preconditions.checkState(block.getType().equals(DataBlock.Type.ROW), "Datablock type is not ROW");
         if (filterArgIdx == -1) {
           blockValSetMap.put(expression, new DataBlockValSet(dataType, block.getDataBlock(), index));
@@ -354,7 +363,8 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       int rowCount = 0;
       for (int rowId = 0; rowId < block.getNumRows(); rowId++) {
-        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx) == 1 ? 1 : 0;
+        // NOTE: The value of filterArgIdx is 0 (FALSE) or 1 (TRUE), so we can directly add them up
+        rowCount += block.getDataBlock().getInt(rowId, filterArgIdx);
       }
       return rowCount;
     }

@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -208,7 +209,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
       processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
     }
     try {
-      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, null, false, _mailboxService);
+      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(), null,
+          _mailboxService);
       Assert.fail("Should have thrown exception!");
     } catch (RuntimeException e) {
       // NOTE: The actual message is (usually) something like:
@@ -271,18 +273,38 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         // test queries with special query options attached
         //   - when leaf limit is set, each server returns multiStageLeafLimit number of rows only.
         new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
+
+        // test groups limit in both leaf and intermediate stage
+        new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
+        new Object[]{"SET numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 1; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
+        new Object[]{"SET numGroupsLimit = 2; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2},
+        // TODO: Consider pushing down hint to the leaf stage
+        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1}
     };
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
   private Object[][] provideTestSqlWithExecutionException() {
     return new Object[][]{
-        // query hint with dynamic broadcast pipeline breaker should return error upstream
+        // Missing index
+        new Object[]{
+            "SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10",
+            "without text index"
+        },
+
+        // Query hint with dynamic broadcast pipeline breaker should return error upstream
         new Object[]{
             "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ col1 FROM a "
                 + " WHERE a.col1 IN (SELECT b.col2 FROM b WHERE textMatch(col1, 'f')) AND a.col3 > 0",
             "without text index"
         },
+
         // Timeout exception should occur with this option:
         new Object[]{
             "SET timeoutMs = 1; SELECT * FROM a JOIN b ON a.col1 = b.col1 JOIN c ON a.col1 = c.col1",

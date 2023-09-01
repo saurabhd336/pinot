@@ -20,7 +20,6 @@ package org.apache.pinot.query.parser;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,7 +35,6 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
@@ -58,7 +56,8 @@ public class CalciteRexExpressionParser {
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
     for (FilterKind filterKind : FilterKind.values()) {
-      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(canonicalizeFunctionNameInternal(filterKind.name()), filterKind.name());
+      CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(RequestUtils.canonicalizeFunctionName(filterKind.name()),
+          filterKind.name());
     }
   }
 
@@ -187,19 +186,10 @@ public class CalciteRexExpressionParser {
       case INPUT_REF:
         return inputRefToIdentifier((RexExpression.InputRef) rexNode, pinotQuery);
       case LITERAL:
-        return rexLiteralToExpression((RexExpression.Literal) rexNode);
+        return RequestUtils.getLiteralExpression(((RexExpression.Literal) rexNode).getValue());
       default:
         return compileFunctionExpression((RexExpression.FunctionCall) rexNode, pinotQuery);
     }
-  }
-
-  private static Expression rexLiteralToExpression(RexExpression.Literal rexLiteral) {
-    // TODO: currently literals are encoded as strings for V1, remove this and use directly literal type when it
-    // supports strong-type in V1.
-    if (rexLiteral.getDataType() == FieldSpec.DataType.TIMESTAMP) {
-      return RequestUtils.getLiteralExpression(((GregorianCalendar) rexLiteral.getValue()).getTimeInMillis());
-    }
-    return RequestUtils.getLiteralExpression(rexLiteral.getValue());
   }
 
   private static Expression inputRefToIdentifier(RexExpression.InputRef inputRef, PinotQuery pinotQuery) {
@@ -287,18 +277,7 @@ public class CalciteRexExpressionParser {
   }
 
   private static String canonicalizeFunctionName(String functionName) {
-    String canonicalizeName = canonicalizeFunctionNameInternal(functionName);
+    String canonicalizeName = RequestUtils.canonicalizeFunctionName(functionName);
     return CANONICAL_NAME_TO_SPECIAL_KEY_MAP.getOrDefault(canonicalizeName, canonicalizeName);
-  }
-
-  /**
-   * Canonicalize Calcite generated Logical function names.
-   */
-  private static String canonicalizeFunctionNameInternal(String functionName) {
-    if (functionName.endsWith("0")) {
-      return functionName.substring(0, functionName.length() - 1).replace("_", "").toLowerCase();
-    } else {
-      return functionName.replace("_", "").toLowerCase();
-    }
   }
 }

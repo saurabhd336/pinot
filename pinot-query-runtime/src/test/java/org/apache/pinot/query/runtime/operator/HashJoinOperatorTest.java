@@ -29,16 +29,15 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -86,11 +85,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleHashJoinKeyCollisionInnerJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     List<RexExpression> joinClauses = new ArrayList<>();
     Mockito.when(_leftOperator.nextBlock())
@@ -99,10 +98,9 @@ public class HashJoinOperatorTest {
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
@@ -121,11 +119,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleInnerJoinOnInt() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -134,10 +132,9 @@ public class HashJoinOperatorTest {
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
@@ -153,11 +150,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleJoinOnEmptySelector() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -166,10 +163,9 @@ public class HashJoinOperatorTest {
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
@@ -191,11 +187,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleLeftJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "CC"}))
@@ -205,10 +201,9 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
@@ -225,21 +220,20 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPassLeftTableEOS() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     List<RexExpression> joinClauses = new ArrayList<>();
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
@@ -253,11 +247,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleLeftJoinOneToN() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -266,10 +260,9 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
@@ -286,11 +279,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPassRightTableEOS() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
@@ -298,10 +291,9 @@ public class HashJoinOperatorTest {
     Mockito.when(_rightOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
 
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
@@ -316,11 +308,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleInequiJoinOnString() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -333,30 +325,32 @@ public class HashJoinOperatorTest {
     List<RexExpression> functionOperands = new ArrayList<>();
     functionOperands.add(new RexExpression.InputRef(1));
     functionOperands.add(new RexExpression.InputRef(3));
-    joinClauses.add(
-        new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, FieldSpec.DataType.STRING, "NOT_EQUALS", functionOperands));
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    joinClauses.add(new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, ColumnDataType.BOOLEAN, "<>", functionOperands));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator join =
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
-    Assert.assertTrue(result.isErrorBlock());
-    MetadataBlock errorBlock = (MetadataBlock) result.getDataBlock();
-    Assert.assertTrue(errorBlock.getExceptions().get(1000).contains("notEquals"));
+    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> expectedRows =
+        Arrays.asList(new Object[]{1, "Aa", 2, "BB"}, new Object[]{1, "Aa", 3, "BB"}, new Object[]{2, "BB", 2, "Aa"});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    for (int i = 0; i < expectedRows.size(); i++) {
+      Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
+    }
   }
 
   @Test
   public void shouldHandleInequiJoinOnInt() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -369,12 +363,10 @@ public class HashJoinOperatorTest {
     List<RexExpression> functionOperands = new ArrayList<>();
     functionOperands.add(new RexExpression.InputRef(0));
     functionOperands.add(new RexExpression.InputRef(2));
-    joinClauses.add(
-        new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, FieldSpec.DataType.STRING, "NOT_EQUALS", functionOperands));
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    joinClauses.add(new RexExpression.FunctionCall(SqlKind.NOT_EQUALS, ColumnDataType.BOOLEAN, "<>", functionOperands));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
@@ -384,17 +376,18 @@ public class HashJoinOperatorTest {
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", 1, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
-    Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
-    Assert.assertEquals(resultRows.get(1), expectedRows.get(1));
+    for (int i = 0; i < expectedRows.size(); i++) {
+      Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
+    }
   }
 
   @Test
   public void shouldHandleRightJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -404,9 +397,8 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-        DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.RIGHT,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
@@ -431,11 +423,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleSemiJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
@@ -445,9 +437,8 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-        DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.SEMI,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
@@ -466,11 +457,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleFullJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
@@ -479,9 +470,8 @@ public class HashJoinOperatorTest {
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-        DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.FULL,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
@@ -509,11 +499,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldHandleAntiJoin() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{4, "CC"}))
@@ -523,9 +513,8 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-        DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
     });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.ANTI,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
@@ -542,11 +531,11 @@ public class HashJoinOperatorTest {
 
   @Test
   public void shouldPropagateRightTableError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
@@ -555,10 +544,9 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinRightError")));
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
@@ -567,17 +555,17 @@ public class HashJoinOperatorTest {
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .contains("testInnerJoinRightError"));
+    Assert.assertTrue(
+        result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinRightError"));
   }
 
   @Test
   public void shouldPropagateLeftTableError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{1, "BB"}, new Object[]{1, "CC"}, new Object[]{3, "BB"}))
@@ -586,10 +574,9 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("testInnerJoinLeftError")));
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
@@ -598,17 +585,16 @@ public class HashJoinOperatorTest {
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(result.getDataBlock().getExceptions().get(QueryException.UNKNOWN_ERROR_CODE)
-        .contains("testInnerJoinLeftError"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("testInnerJoinLeftError"));
   }
 
   @Test
   public void shouldPropagateJoinLimitError() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -618,15 +604,12 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    Map<String, String> hintsMap = ImmutableMap.of(
-        PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
-        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1"
-    );
+    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
+        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1");
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
     HashJoinOperator join =
@@ -634,18 +617,17 @@ public class HashJoinOperatorTest {
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
-    Assert.assertTrue(
-        result.getDataBlock().getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
-            .contains("reach number of rows limit"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("reach number of rows limit"));
   }
 
   @Test
   public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimit() {
-    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
-    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}))
@@ -655,15 +637,12 @@ public class HashJoinOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     List<RexExpression> joinClauses = new ArrayList<>();
-    DataSchema resultSchema = new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"},
-        new DataSchema.ColumnDataType[]{
-            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.STRING
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
-    Map<String, String> hintsMap = ImmutableMap.of(
-        PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
-        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1"
-    );
+    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
+        PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1");
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
     HashJoinOperator join =
@@ -672,9 +651,8 @@ public class HashJoinOperatorTest {
     TransferableBlock result = join.nextBlock();
     Assert.assertFalse(result.isErrorBlock());
     Assert.assertEquals(result.getNumRows(), 1);
-    Assert.assertTrue(
-        result.getDataBlock().getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
-            .contains("reach number of rows limit"));
+    Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("reach number of rows limit"));
   }
 }
 // TODO: Add more inequi join tests.

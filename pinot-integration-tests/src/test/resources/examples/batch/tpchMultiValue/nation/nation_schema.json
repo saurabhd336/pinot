@@ -1,0 +1,24 @@
+{
+  "schemaName": "nation",
+  "metricFieldSpecs": [
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "n_nationkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "n_name",
+      "singleValueField":false
+    },
+    {
+      "dataType": "INT",
+      "name": "n_regionkey"
+    },
+    {
+      "dataType": "STRING",
+      "name": "n_comment"
+    }
+  ]
+}
