@@ -370,6 +370,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
       return;
     }
+    if (indexType == StandardIndexes.clp()) {
+      ClpIndexUtils.cleanupClpIndex(_segmentDirectory, columnName);
+      return;
+    }
     // Only remember to cleanup indices upon close(), if any existing
     // index gets marked for removal.
     if (_columnEntries.remove(new IndexKey(columnName, indexType)) != null) {
@@ -389,6 +393,18 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       }
       return columns;
     }
+
+    // CLP is not tracked via _columnEntries, so handled separately.
+    if (type == StandardIndexes.clp()) {
+      for (String column : _segmentMetadata.getAllColumns()) {
+        if (ClpIndexUtils.hasClpIndex(_segmentDirectory, column)) {
+          columns.add(column);
+        }
+      }
+      return columns;
+    }
+
+
     for (IndexKey indexKey : _columnEntries.keySet()) {
       if (indexKey._type == type) {
         columns.add(indexKey._name);
