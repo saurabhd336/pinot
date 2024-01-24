@@ -103,8 +103,8 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
 
     _encodedVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
-        new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.PASS_THROUGH, numDocs,
-            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false,
+        new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.LZ4, numDocs,
+            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), true,
             VarByteChunkForwardIndexWriterV4.VERSION);
     _clpStats.clear();
 
