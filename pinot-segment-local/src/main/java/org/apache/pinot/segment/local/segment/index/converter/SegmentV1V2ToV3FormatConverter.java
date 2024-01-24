@@ -157,7 +157,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         for (String column : v2Metadata.getAllColumns()) {
           for (IndexType<?, ?, ?> indexType : sortedIndexTypes()) {
             // NOTE: Text index is copied separately
-            if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()) {
+            if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()
+                && indexType != StandardIndexes.clp()) {
               copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
             }
           }
@@ -167,6 +168,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     }
     copyLuceneTextIndexIfExists(v2Directory, v3Directory);
     copyVectorIndexIfExists(v2Directory, v3Directory);
+    copyClpIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
   }
 
@@ -279,6 +281,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         Files.copy(indexFile.toPath(), v3VectorIndexFile.toPath());
       }
     }
+  }
+
+  private void copyClpIndexIfExists(File segmentDirectory, File v3Dir)
+      throws IOException {
+    // TODO: right now simply handled by text index copy
   }
 
   private void deleteStaleConversionDirectories(File segmentDirectory) {
