@@ -20,13 +20,15 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 
+
 public class ClpIndexUtils {
   private ClpIndexUtils() {
   }
+
   public static boolean hasClpIndex(File segmentDir, String columnName) {
-    return TextIndexUtils.hasTextIndex(segmentDir, columnName + "_logtype_clp") &&
-        TextIndexUtils.hasTextIndex(segmentDir, columnName + "_dictvar_clp") &&
-        TextIndexUtils.hasTextIndex(segmentDir, columnName + "_encodedvar_clp");
+    return TextIndexUtils.hasTextIndex(segmentDir, columnName + "_logtype_clp") && TextIndexUtils.hasTextIndex(
+        segmentDir, columnName + "_dictvar_clp") && TextIndexUtils.hasTextIndex(segmentDir,
+        columnName + "_encodedvar_clp");
   }
 
   public static void cleanupClpIndex(File segmentDir, String columnName) {
