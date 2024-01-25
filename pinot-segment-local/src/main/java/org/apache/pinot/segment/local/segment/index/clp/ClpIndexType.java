@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.clp;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -45,6 +46,7 @@ import org.apache.pinot.spi.data.Schema;
 public class ClpIndexType extends AbstractIndexType<ClpIndexConfig, ClpIndexReader, ClpIndexCreator> {
   public static final ClpIndexType INSTANCE = new ClpIndexType();
   private static final String DISPLAY_NAME = "clp";
+  public static final String EXTENSION = ".clp";
 
   public ClpIndexType() {
     super(StandardIndexes.CLP_ID);
@@ -92,7 +94,7 @@ public class ClpIndexType extends AbstractIndexType<ClpIndexConfig, ClpIndexRead
 
   @Override
   public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
-    return null;
+    return Collections.singletonList(EXTENSION);
   }
 
   @Override

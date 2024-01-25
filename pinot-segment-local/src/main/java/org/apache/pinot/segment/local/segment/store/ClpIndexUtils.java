@@ -19,6 +19,9 @@
 package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
+import org.apache.pinot.segment.spi.V1Constants;
 
 
 public class ClpIndexUtils {
@@ -26,14 +29,10 @@ public class ClpIndexUtils {
   }
 
   public static boolean hasClpIndex(File segmentDir, String columnName) {
-    return TextIndexUtils.hasTextIndex(segmentDir, columnName + "_logtype_clp") && TextIndexUtils.hasTextIndex(
-        segmentDir, columnName + "_dictvar_clp") && TextIndexUtils.hasTextIndex(segmentDir,
-        columnName + "_encodedvar_clp");
+    return new File(segmentDir, columnName + ClpIndexType.EXTENSION).exists();
   }
 
   public static void cleanupClpIndex(File segmentDir, String columnName) {
-    TextIndexUtils.cleanupTextIndex(segmentDir, columnName + "_logtype_clp");
-    TextIndexUtils.cleanupTextIndex(segmentDir, columnName + "_dictvar_clp");
-    TextIndexUtils.cleanupTextIndex(segmentDir, columnName + "_encodedvar_clp");
+    FileUtils.deleteQuietly(new File(segmentDir, columnName + ClpIndexType.EXTENSION));
   }
 }

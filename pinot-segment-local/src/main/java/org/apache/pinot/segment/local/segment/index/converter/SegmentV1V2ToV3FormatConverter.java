@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
@@ -285,7 +286,28 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyClpIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
-    // TODO: right now simply handled by text index copy
+    // TODO: see if this can be done by reusing some existing methods
+    String suffix = ClpIndexType.EXTENSION;
+    File[] clpIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(suffix);
+      }
+    });
+    for (File clpIndexFile : clpIndexFiles) {
+      File[] indexFiles = clpIndexFile.listFiles();
+      File v3ClpIndexDir = new File(v3Dir, clpIndexFile.getName());
+      v3ClpIndexDir.mkdir();
+      for (File indexFile : indexFiles) {
+        // There are multiple directories inside each individual clp directory.
+        File v3ClpIndexSubDir = new File(v3ClpIndexDir, indexFile.getName());
+        v3ClpIndexSubDir.mkdir();
+        for (File subIndexFile : indexFile.listFiles()) {
+          File v3ClpIndexFile = new File(v3ClpIndexSubDir, subIndexFile.getName());
+          Files.copy(subIndexFile.toPath(), v3ClpIndexFile.toPath());
+        }
+      }
+    }
   }
 
   private void deleteStaleConversionDirectories(File segmentDirectory) {

@@ -26,6 +26,7 @@ import java.io.IOException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ClpIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -44,12 +45,13 @@ public class ClpIndexCreatorV1 implements ClpIndexCreator {
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+    File clpIndexParentDir = new File(indexDir, columnName + ClpIndexType.EXTENSION);
 
-    _logTypeLuceneIndexCreator = new LuceneTextIndexCreator(columnName + "_logtype_clp", indexDir, true,
+    _logTypeLuceneIndexCreator = new LuceneTextIndexCreator(columnName + "_logtype_clp", clpIndexParentDir, true,
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null));
-    _dictVarLuceneIndexCreator = new LuceneTextIndexCreator(columnName + "_dictvar_clp", indexDir, true,
+    _dictVarLuceneIndexCreator = new LuceneTextIndexCreator(columnName + "_dictvar_clp", clpIndexParentDir, true,
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null));
-    _encodedVarLuceneIndexCreator = new LuceneTextIndexCreator(columnName + "_encodedvar_clp", indexDir, true,
+    _encodedVarLuceneIndexCreator = new LuceneTextIndexCreator(columnName + "_encodedvar_clp", clpIndexParentDir, true,
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null));
   }
 

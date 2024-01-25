@@ -26,6 +26,7 @@ import com.yscope.clp.compressorfrontend.EightByteClpWildcardQueryEncoder;
 import java.io.File;
 import java.io.IOException;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.ClpIndexReader;
@@ -42,11 +43,12 @@ public class ClpIndexReaderV1 implements ClpIndexReader {
 
   public ClpIndexReaderV1(File indexDir, int numDocs, String columnName)
       throws IOException {
-    _logTypeLuceneIndexReader = new LuceneTextIndexReader(columnName + "_logtype_clp", indexDir, numDocs,
+    File clpIndexDir = new File(indexDir, columnName + ClpIndexType.EXTENSION);
+    _logTypeLuceneIndexReader = new LuceneTextIndexReader(columnName + "_logtype_clp", clpIndexDir, numDocs,
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null));
-    _dictVarLuceneIndexReader = new LuceneTextIndexReader(columnName + "_dictvar_clp", indexDir, numDocs,
+    _dictVarLuceneIndexReader = new LuceneTextIndexReader(columnName + "_dictvar_clp", clpIndexDir, numDocs,
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null));
-    _encodedVarLuceneIndexReader = new LuceneTextIndexReader(columnName + "_encodedvar_clp", indexDir, numDocs,
+    _encodedVarLuceneIndexReader = new LuceneTextIndexReader(columnName + "_encodedvar_clp", clpIndexDir, numDocs,
         new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null));
   }
 
