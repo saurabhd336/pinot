@@ -104,6 +104,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
     } else if (indexType == StandardIndexes.vector()) {
       VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
+    } else if (indexType == StandardIndexes.clp()) {
+      ClpIndexUtils.cleanupClpIndex(_segmentDirectory, columnName);
     } else {
       getFilesFor(columnName, indexType).forEach(FileUtils::deleteQuietly);
     }

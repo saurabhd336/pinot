@@ -57,11 +57,11 @@ public class ClpIndexHandler implements IndexHandler {
   private void removeIndexes(SegmentDirectory.Writer segmentWriter) {
     // Remove indices not set in table config any more
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ClpIndexType.INSTANCE);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.clp());
     for (String column : existingColumns) {
       if (!_clpIndexConfigs.containsKey(column)) {
         LOGGER.info("Removing existing clp index from segment: {}, column: {}", segmentName, column);
-        segmentWriter.removeIndex(column, ClpIndexType.INSTANCE);
+        segmentWriter.removeIndex(column, StandardIndexes.clp());
         LOGGER.info("Removed existing clp index from segment: {}, column: {}", segmentName, column);
       }
     }
@@ -69,7 +69,7 @@ public class ClpIndexHandler implements IndexHandler {
 
   private void buildIndexes(SegmentDirectory.Writer segmentWriter) {
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(ClpIndexType.INSTANCE);
+    Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.clp());
     for (String column : _clpIndexConfigs.keySet()) {
       if (!existingColumns.contains(column)) {
         LOGGER.info("Building clp index for segment: {}, column: {}", segmentName, column);
@@ -105,7 +105,7 @@ public class ClpIndexHandler implements IndexHandler {
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
       throws Exception {
     String segmentName = _segmentMetadata.getName();
-    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(ClpIndexType.INSTANCE);
+    Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.clp());
     // Check if any existing index need to be removed.
     for (String column : existingColumns) {
       if (!_clpIndexConfigs.containsKey(column)) {

@@ -117,6 +117,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
+      if (file.isDirectory() && file.getName().endsWith(ClpIndexType.EXTENSION)) {
+        FileUtils.deleteDirectory(file);
+      }
     }
   }
 
