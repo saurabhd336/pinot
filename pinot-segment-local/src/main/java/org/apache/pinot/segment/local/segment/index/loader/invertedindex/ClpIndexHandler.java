@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;

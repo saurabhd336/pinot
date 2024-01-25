@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.store;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
-import org.apache.pinot.segment.spi.V1Constants;
 
 
 public class ClpIndexUtils {
