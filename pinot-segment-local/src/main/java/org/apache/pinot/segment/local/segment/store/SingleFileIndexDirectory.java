@@ -146,6 +146,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     if (type == StandardIndexes.vector()) {
       return VectorIndexUtils.hasVectorIndex(_segmentDirectory, column);
     }
+    if (type == StandardIndexes.clp()) {
+      return ClpIndexUtils.hasClpIndex(_segmentDirectory, column);
+    }
     IndexKey key = new IndexKey(column, type);
     return _columnEntries.containsKey(key);
   }
