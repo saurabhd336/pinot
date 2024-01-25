@@ -109,14 +109,20 @@ public class RegexpLikePredicateEvaluatorFactory {
     }
   }
 
-  private static final class RawValueBasedRegexpLikePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+  public static final class RawValueBasedRegexpLikePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
     // Reuse matcher to avoid excessive allocation. This is safe to do because the evaluator is always used
     // within the scope of a single thread.
     final Matcher _matcher;
+    final String _query;
 
     public RawValueBasedRegexpLikePredicateEvaluator(RegexpLikePredicate regexpLikePredicate) {
       super(regexpLikePredicate);
+      _query = regexpLikePredicate.getValue();
       _matcher = regexpLikePredicate.getPattern().matcher("");
+    }
+
+    public String getQuery() {
+      return _query;
     }
 
     @Override

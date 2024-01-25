@@ -21,22 +21,30 @@ package org.apache.pinot.core.operator.filter;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.filter.predicate.RegexpLikePredicateEvaluatorFactory;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.ClpIndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-public class CLPMatchFilterOperator extends BaseFilterOperator {
+
+public class CLPMatchFilterOperator extends BaseColumnFilterOperator {
   private static final String EXPLAIN_NAME = "CLP_INDEX_FILTER_OPERATOR";
   private ImmutableRoaringBitmap _matches;
   private final ClpIndexReader _clpIndexReader;
-  private final RegexpLikePredicate _predicate;
-  public CLPMatchFilterOperator(ClpIndexReader clpIndexReader, RegexpLikePredicate predicate, int numDocs) {
-    super(numDocs, false);
-    _clpIndexReader = clpIndexReader;
-    _predicate = predicate;
+  private final RegexpLikePredicateEvaluatorFactory.RawValueBasedRegexpLikePredicateEvaluator _predicateEvaluator;
+
+  public CLPMatchFilterOperator(QueryContext queryContext, DataSource dataSource,
+      RegexpLikePredicateEvaluatorFactory.RawValueBasedRegexpLikePredicateEvaluator predicateEvaluator, int numDocs) {
+    super(queryContext, dataSource, numDocs);
+    _clpIndexReader = dataSource.getIndex(StandardIndexes.clp());
+    _predicateEvaluator = predicateEvaluator;
   }
 
   @Override
@@ -51,10 +59,21 @@ public class CLPMatchFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected BlockDocIdSet getTrues() {
+  protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     if (_matches == null) {
-      _matches = _clpIndexReader.getDocIds(_predicate.getValue());
+      _matches = _clpIndexReader.getDocIds(_predicateEvaluator.getQuery());
     }
-    return new BitmapDocIdSet(_matches, _numDocs);
+
+    ScanBasedFilterOperator scanBasedFilterOperator =
+        new ScanBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs);
+    BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getTrues();
+    MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(_matches);
+    return new BitmapDocIdSet(docIds, _numDocs) {
+      // Override this method to reflect the entries scanned
+      @Override
+      public long getNumEntriesScannedInFilter() {
+        return scanBasedDocIdSet.getNumEntriesScannedInFilter();
+      }
+    };
   }
 }

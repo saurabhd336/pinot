@@ -282,9 +282,6 @@ public class FilterPlanNode implements PlanNode {
                 predicateEvaluator =
                     FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
                         dataSource.getFSTIndex(), dataSource.getDictionary());
-              } else if (dataSource.getIndex(StandardIndexes.clp()) != null) {
-                return new CLPMatchFilterOperator(dataSource.getIndex(StandardIndexes.clp()),
-                    (RegexpLikePredicate) predicate, numDocs);
               } else {
                 predicateEvaluator =
                     PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),

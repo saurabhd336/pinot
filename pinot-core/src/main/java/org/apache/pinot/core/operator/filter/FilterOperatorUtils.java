@@ -24,8 +24,10 @@ import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RegexpLikePredicateEvaluatorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -108,6 +110,11 @@ public class FilterOperatorUtils {
         }
         if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
+        if (dataSource.getIndex(StandardIndexes.clp()) != null) {
+          return new CLPMatchFilterOperator(queryContext, dataSource,
+              (RegexpLikePredicateEvaluatorFactory.RawValueBasedRegexpLikePredicateEvaluator) predicateEvaluator,
+              numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
