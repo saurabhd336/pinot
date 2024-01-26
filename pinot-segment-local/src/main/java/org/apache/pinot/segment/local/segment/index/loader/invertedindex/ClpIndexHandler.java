@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
+import java.io.File;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.clp.ClpIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -89,6 +92,22 @@ public class ClpIndexHandler implements IndexHandler {
     IndexCreationContext context =
         IndexCreationContext.builder().withIndexDir(_segmentMetadata.getIndexDir()).withColumnMetadata(columnMetadata)
             .build();
+
+    File inProgress = new File(_segmentMetadata.getIndexDir(),
+        columnMetadata.getColumnName() + ClpIndexType.EXTENSION + ".inprogress");
+    File clpIndexFile =
+        new File(_segmentMetadata.getIndexDir(), columnMetadata.getColumnName() + ClpIndexType.EXTENSION);
+
+    if (!inProgress.exists()) {
+      // Marker file does not exist, which means last run ended normally.
+      // Create a marker file.
+      FileUtils.touch(inProgress);
+    } else {
+      // Marker file exists, which means last run gets interrupted.
+      // Remove sparse index if exists.
+      // For v1 and v2, it's the actual sparse index. For v3, it's the temporary sparse index.
+      FileUtils.deleteQuietly(clpIndexFile);
+    }
 
     try (ClpIndexCreator clpIndexCreator = StandardIndexes.clp().createIndexCreator(context, indexConfig);
         ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
