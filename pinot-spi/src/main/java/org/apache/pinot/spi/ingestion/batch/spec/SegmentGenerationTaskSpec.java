@@ -149,11 +149,15 @@ public class SegmentGenerationTaskSpec implements Serializable {
     _createMetadataTarGz = createMetadataTarGz;
   }
 
-  public void setCustomProperty(String key, String value) {
-    if (!key.startsWith(CUSTOM_PREFIX)) {
+  public void setCustomProperty(String key, String value, boolean override) {
+    if (!override && !key.startsWith(CUSTOM_PREFIX)) {
       key = CUSTOM_PREFIX + key;
     }
     _customProperties.put(key, value);
+  }
+
+  public void setCustomProperty(String key, String value) {
+    setCustomProperty(key, value, false);
   }
 
   public String getCustomProperty(String key) {
@@ -163,10 +167,14 @@ public class SegmentGenerationTaskSpec implements Serializable {
     return _customProperties.get(key);
   }
 
-  public void setCustomProperties(Map<String, String> customProperties) {
+  public void setCustomProperties(Map<String, String> customProperties, boolean override) {
     for (String key : customProperties.keySet()) {
-      setCustomProperty(key, customProperties.get(key));
+      setCustomProperty(key, customProperties.get(key), override);
     }
+  }
+
+  public void setCustomProperties(Map<String, String> customProperties) {
+    setCustomProperties(customProperties, false);
   }
 
   public Map<String, String> getCustomProperties() {

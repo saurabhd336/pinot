@@ -21,6 +21,7 @@ package org.apache.pinot.spi.ingestion.batch.spec;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -143,6 +144,11 @@ public class SegmentGenerationJobSpec implements Serializable {
    * Create a separated metadata only tar gz file to reduce the data transfer of segment metadata push job.
    */
   private boolean _createMetadataTarGz;
+
+  /**
+   *   Custom properties set into segment metadata
+   */
+  private Map<String, String> _customSegmentPropertiesOverride;
 
   public ExecutionFrameworkSpec getExecutionFrameworkSpec() {
     return _executionFrameworkSpec;
@@ -322,6 +328,14 @@ public class SegmentGenerationJobSpec implements Serializable {
 
   public void setCreateMetadataTarGz(boolean createMetadataTarGz) {
     _createMetadataTarGz = createMetadataTarGz;
+  }
+
+  public Map<String, String> getCustomSegmentPropertiesOverride() {
+    return _customSegmentPropertiesOverride;
+  }
+
+  public void setCustomSegmentPropertiesOverride(Map<String, String> customSegmentPropertiesOverride) {
+    _customSegmentPropertiesOverride = customSegmentPropertiesOverride;
   }
 
   public String toJSONString(boolean removeSensitiveKeys) {

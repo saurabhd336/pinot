@@ -246,6 +246,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     taskSpec.setFailOnEmptySegment(_spec.isFailOnEmptySegment());
     taskSpec.setCreateMetadataTarGz(_spec.isCreateMetadataTarGz());
     taskSpec.setCustomProperty(BatchConfigProperties.INPUT_DATA_FILE_URI_KEY, inputFileURI.toString());
+    taskSpec.setCustomProperties(_spec.getCustomSegmentPropertiesOverride(), true);
 
     // If there's already been a failure, log and skip this file. Do this check right before the
     // submit to reduce odds of starting a new segment when a failure is recorded right before the
