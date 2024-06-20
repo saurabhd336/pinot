@@ -40,6 +40,7 @@ public class PinotSegmentColumnReader implements Closeable {
   private final NullValueVectorReader _nullValueVectorReader;
   private final int[] _dictIdBuffer;
   private final int _maxNumValuesPerMVEntry;
+  private final DataType _dataType;
 
   public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
     DataSource dataSource = indexSegment.getDataSource(column);
@@ -57,6 +58,7 @@ public class PinotSegmentColumnReader implements Closeable {
       Preconditions.checkState(_maxNumValuesPerMVEntry >= 0, "maxNumValuesPerMVEntry is negative for an MV column.");
       _dictIdBuffer = new int[_maxNumValuesPerMVEntry];
     }
+    _dataType = (_dictionary == null) ? _forwardIndexReader.getStoredType() : _dictionary.getValueType();
   }
 
   public PinotSegmentColumnReader(ForwardIndexReader forwardIndexReader, @Nullable Dictionary dictionary,
@@ -71,6 +73,7 @@ public class PinotSegmentColumnReader implements Closeable {
     } else {
       _dictIdBuffer = new int[maxNumValuesPerMVEntry];
     }
+    _dataType = (_dictionary == null) ? _forwardIndexReader.getStoredType() : _dictionary.getValueType();
   }
 
   public boolean isSingleValue() {
@@ -87,6 +90,24 @@ public class PinotSegmentColumnReader implements Closeable {
 
   public int getDictId(int docId) {
     return _forwardIndexReader.getDictId(docId, _forwardIndexReaderContext);
+  }
+
+  public Object getValue(int docId, boolean annonymize) {
+    Object val = getValue(docId);
+    if (!annonymize) {
+      return val;
+    }
+
+    if (_forwardIndexReader.isSingleValue()) {
+      return DataAnonymizer.anonymize(val, _dataType);
+    } else {
+      Object[] vals = (Object[]) val;
+      for (int i = 0; i < vals.length; i++) {
+        vals[i] = DataAnonymizer.anonymize(vals[i], _dataType);
+      }
+
+      return vals;
+    }
   }
 
   public Object getValue(int docId) {
